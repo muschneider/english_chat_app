@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: `dark:` variants apply under a `.dark` ancestor. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -19,6 +22,10 @@
   color-scheme: light;
 }
 
+.dark {
+  color-scheme: dark;
+}
+
 html,
 body {
   height: 100%;
@@ -34,6 +41,13 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.dark body {
+  background:
+    radial-gradient(1200px 600px at 100% -10%, #1e1b4b 0%, transparent 55%),
+    radial-gradient(1000px 500px at -10% 110%, #052e2b 0%, transparent 50%),
+    #020617;
+}
+
 /* Thin, modern scrollbar for the chat area. */
 .scroll-slim {
   scrollbar-width: thin;
@@ -47,6 +61,12 @@ body {
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
+}
+.dark .scroll-slim {
+  scrollbar-color: #334155 transparent;
+}
+.dark .scroll-slim::-webkit-scrollbar-thumb {
+  background-color: #334155;
 }
 
 /* Message entrance. */

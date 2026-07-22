@@ -22,7 +22,7 @@ function ChipRow({
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {title}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -57,18 +57,18 @@ export function SurvivalKit({
   if (!hasAnything) return null;
 
   return (
-    <div className="mt-2 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50/60">
+    <div className="mt-2 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50/60 dark:border-brand-900/50 dark:bg-brand-950/30">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-brand-100/50"
+        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-brand-100/50 dark:hover:bg-brand-900/30"
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-brand-800">
+        <span className="flex items-center gap-2 text-sm font-semibold text-brand-800 dark:text-brand-200">
           <span aria-hidden>🧰</span> Helpful Toolkit
         </span>
         <svg
-          className={`h-4 w-4 text-brand-600 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-brand-600 transition-transform dark:text-brand-400 ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20"
           fill="currentColor"
           aria-hidden
@@ -86,29 +86,29 @@ export function SurvivalKit({
           <ChipRow
             title="Useful verbs"
             items={toolkit.usefulVerbs}
-            tone="bg-white text-slate-700 ring-slate-200"
+            tone="bg-white text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700"
           />
           <ChipRow
             title="Useful expressions"
             items={toolkit.usefulExpressions}
-            tone="bg-white text-brand-700 ring-brand-200"
+            tone="bg-white text-brand-700 ring-brand-200 dark:bg-slate-800 dark:text-brand-300 dark:ring-brand-900/60"
           />
           <ChipRow
             title="Useful connectors"
             items={toolkit.usefulConnectors}
-            tone="bg-white text-emerald-700 ring-emerald-200"
+            tone="bg-white text-emerald-700 ring-emerald-200 dark:bg-slate-800 dark:text-emerald-300 dark:ring-emerald-900/60"
           />
 
           {hasTip && (
-            <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
+            <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60">
               <span className="font-semibold">💡 Grammar tip: </span>
               {toolkit.grammarTip}
             </div>
           )}
 
           {miniStructure && (
-            <div className="rounded-xl bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200">
-              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 ✨ Mini structure
               </p>
               <p className="whitespace-pre-line font-medium">{miniStructure}</p>
@@ -116,8 +116,8 @@ export function SurvivalKit({
           )}
 
           {modelAnswer && (
-            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
-              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60">
+              <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
                 Suggested answer
               </p>
               <p className="italic">&ldquo;{modelAnswer}&rdquo;</p>

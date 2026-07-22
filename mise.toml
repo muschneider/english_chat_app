@@ -46,6 +46,14 @@ run = "npm run db:migrate"
 description = "Push the Drizzle schema straight to Neon (dev-friendly)"
 run = "npm run db:push"
 
+[tasks."db:apply"]
+description = "Apply the latest migration file non-interactively"
+run = "npm run db:apply"
+
+[tasks."db:seed"]
+description = "Create/ensure the admin (set ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD)"
+run = "npm run db:seed"
+
 [tasks."db:studio"]
 description = "Open Drizzle Studio to inspect the database"
 run = "npm run db:studio"

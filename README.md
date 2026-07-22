@@ -79,6 +79,34 @@ DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
 
 ---
 
+## Contas, aprovação e tema
+
+O app é protegido por login. O fluxo:
+
+1. **Cadastro** (`/register`) com nome, e-mail e senha → a conta nasce
+   **`pending`** (aguardando aprovação).
+2. Um **admin** aprova/rejeita em **`/admin`**. Só contas **`approved`** (ou o
+   próprio admin) acessam o tutor.
+3. **Tema claro/escuro** é escolhido pelo botão no cabeçalho e fica salvo **por
+   usuário** (coluna `users.theme` + cookie espelho, sem “flash” ao carregar).
+
+Segurança: senhas com **scrypt** (nativo do Node), sessão via cookie
+**HttpOnly** com apenas o hash do token guardado no banco (`auth_sessions`), e
+cada conversa é escopada ao seu dono.
+
+### Criar o admin (seed)
+
+Depois de aplicar o schema, rode uma vez (idempotente):
+
+```bash
+ADMIN_EMAIL="voce@exemplo.com" ADMIN_NAME="Seu Nome" mise run db:seed
+```
+
+Sem `ADMIN_PASSWORD`, uma senha forte é **gerada e impressa uma única vez**.
+Para aplicar a migração de forma não-interativa: `mise run db:apply`.
+
+---
+
 ## Tasks do mise
 
 | Task | O que faz |

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { getThemeCookie } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,12 +15,19 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const theme = await getThemeCookie();
   return (
-    <html lang="en">
-      <body className="min-h-full text-slate-800 antialiased">{children}</body>
+    <html
+      lang="en"
+      className={theme === "dark" ? "dark" : undefined}
+      suppressHydrationWarning
+    >
+      <body className="min-h-full text-slate-800 antialiased dark:text-slate-100">
+        {children}
+      </body>
     </html>
   );
 }

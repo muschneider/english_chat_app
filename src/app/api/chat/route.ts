@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { advanceConversation } from "@/lib/services/conversation";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,14 @@ const bodySchema = z.object({
 
 /** POST /api/chat -> advance the conversation (reply or request a hint). */
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  if (user.role !== "admin" && user.status !== "approved") {
+    return NextResponse.json({ error: "Account not approved." }, { status: 403 });
+  }
+
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(await request.json());
@@ -30,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await advanceConversation(parsed);
+    const result = await advanceConversation({ ...parsed, userId: user.id });
     if (!result) {
       return NextResponse.json(
         { error: "Session not found or empty message." },

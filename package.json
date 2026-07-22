@@ -11,7 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:apply": "node --env-file=.env.local scripts/apply-migration.ts",
+    "db:seed": "node --env-file=.env.local scripts/seed-admin.ts"
   },
   "engines": {
     "node": ">=20"

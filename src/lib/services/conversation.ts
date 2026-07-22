@@ -44,12 +44,12 @@ async function loadErrorTally(sessionId: string) {
   return rows;
 }
 
-/** Create a brand new session and generate the opening teacher turn. */
-export async function createSession(): Promise<{
+/** Create a brand new session (owned by `userId`) and generate the opening turn. */
+export async function createSession(userId: string): Promise<{
   session: SessionRow;
   message: ClientMessage;
 }> {
-  const [session] = await db.insert(sessions).values({}).returning();
+  const [session] = await db.insert(sessions).values({ userId }).returning();
 
   const context: TurnContext = {
     intent: "start",
@@ -82,15 +82,18 @@ export async function createSession(): Promise<{
   return { session: updated, message: toClientMessage(teacherRow) };
 }
 
-/** Load a session and its full transcript. */
-export async function getSession(sessionId: string): Promise<{
+/** Load a session and its full transcript, scoped to its owner. */
+export async function getSession(
+  sessionId: string,
+  userId: string,
+): Promise<{
   session: SessionRow;
   messages: ClientMessage[];
 } | null> {
   const [session] = await db
     .select()
     .from(sessions)
-    .where(eq(sessions.id, sessionId));
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
   if (!session) return null;
 
   const rows = await db
@@ -104,6 +107,7 @@ export async function getSession(sessionId: string): Promise<{
 
 export interface AdvanceArgs {
   sessionId: string;
+  userId: string;
   intent: "reply" | "hint";
   message?: string;
   hintLevel?: number;
@@ -124,12 +128,12 @@ export interface AdvanceResult {
 export async function advanceConversation(
   args: AdvanceArgs,
 ): Promise<AdvanceResult | null> {
-  const { sessionId, intent } = args;
+  const { sessionId, userId, intent } = args;
 
   const [session] = await db
     .select()
     .from(sessions)
-    .where(eq(sessions.id, sessionId));
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
   if (!session) return null;
 
   // Recent transcript for the model (chronological).

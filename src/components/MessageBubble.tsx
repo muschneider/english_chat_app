@@ -31,7 +31,7 @@ function SpeakButton({ text }: { text: string }) {
       type="button"
       onClick={speak}
       aria-label={speaking ? "Stop audio" : "Listen to this message"}
-      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 transition hover:text-brand-600"
+      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 transition hover:text-brand-600 dark:text-slate-500 dark:hover:text-brand-400"
     >
       <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
         <path d="M10 3.75a.75.75 0 00-1.264-.546L5.203 6.5H3.167A1.167 1.167 0 002 7.667v4.666A1.167 1.167 0 003.167 13.5h2.036l3.533 3.296A.75.75 0 0010 16.25V3.75z" />
@@ -75,7 +75,7 @@ export function MessageBubble({
           T
         </div>
         <div className="min-w-0 flex-1">
-          <div className="inline-block max-w-full rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-slate-800 shadow-sm ring-1 ring-slate-100">
+          <div className="inline-block max-w-full rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-slate-800 shadow-sm ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
             <p className="whitespace-pre-wrap break-words leading-relaxed">
               {message.content}
             </p>

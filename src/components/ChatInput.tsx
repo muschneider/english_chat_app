@@ -78,20 +78,20 @@ export function ChatInput({ onSend, onHint, disabled, hintLevel }: Props) {
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white/80 px-3 py-3 backdrop-blur sm:px-4">
+    <div className="border-t border-slate-200 bg-white/80 px-3 py-3 backdrop-blur sm:px-4 dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <button
           type="button"
           onClick={onHint}
           disabled={disabled}
           title="I'm stuck — get a hint"
-          className="hidden shrink-0 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50 sm:inline-flex"
+          className="hidden shrink-0 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50 sm:inline-flex dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/40"
         >
           <span aria-hidden>🪜</span>
           {hintLevel > 0 ? `Hint ${Math.min(hintLevel, 3)}/3` : "I'm stuck"}
         </button>
 
-        <div className="flex flex-1 items-end rounded-2xl border border-slate-300 bg-white shadow-sm focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100">
+        <div className="flex flex-1 items-end rounded-2xl border border-slate-300 bg-white shadow-sm focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:focus-within:border-brand-500 dark:focus-within:ring-brand-900/60">
           <textarea
             ref={textareaRef}
             value={text}
@@ -106,7 +106,7 @@ export function ChatInput({ onSend, onHint, disabled, hintLevel }: Props) {
             disabled={disabled}
             placeholder="Type your answer in English…"
             aria-label="Your answer in English"
-            className="max-h-40 flex-1 resize-none bg-transparent px-4 py-2.5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60"
+            className="max-h-40 flex-1 resize-none bg-transparent px-4 py-2.5 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-60 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
 
           <div className="flex items-center gap-1 pb-1.5 pr-1.5">
@@ -117,7 +117,7 @@ export function ChatInput({ onSend, onHint, disabled, hintLevel }: Props) {
               disabled={disabled}
               title="I'm stuck — get a hint"
               aria-label="I'm stuck, get a hint"
-              className="grid h-9 w-9 place-items-center rounded-xl text-sky-600 transition hover:bg-sky-50 disabled:opacity-50 sm:hidden"
+              className="grid h-9 w-9 place-items-center rounded-xl text-sky-600 transition hover:bg-sky-50 disabled:opacity-50 sm:hidden dark:text-sky-400 dark:hover:bg-sky-950/40"
             >
               🪜
             </button>
@@ -132,7 +132,7 @@ export function ChatInput({ onSend, onHint, disabled, hintLevel }: Props) {
                 className={`grid h-9 w-9 place-items-center rounded-xl transition disabled:opacity-50 ${
                   recording
                     ? "animate-rec bg-rose-500 text-white"
-                    : "text-slate-500 hover:bg-slate-100"
+                    : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
                 }`}
               >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -156,7 +156,7 @@ export function ChatInput({ onSend, onHint, disabled, hintLevel }: Props) {
           </div>
         </div>
       </div>
-      <p className="mx-auto mt-1.5 max-w-3xl px-1 text-center text-[11px] text-slate-400">
+      <p className="mx-auto mt-1.5 max-w-3xl px-1 text-center text-[11px] text-slate-400 dark:text-slate-500">
         Press Enter to send · Shift+Enter for a new line
         {micSupported ? " · 🎤 mic & 🔊 listen enabled" : ""}
       </p>
