@@ -7,12 +7,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.18",
@@ -32,6 +34,6 @@
     "drizzle-kit": "^0.31.10",
     "postcss": "^8.5.22",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3"
   }
 }
