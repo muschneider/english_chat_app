@@ -85,7 +85,7 @@ export async function loginAction(
   await setThemeCookie(user.theme);
 
   if (user.role !== "admin" && user.status !== "approved") redirect("/pending");
-  redirect("/");
+  redirect("/app");
 }
 
 /** Sign out and return to the login page. */

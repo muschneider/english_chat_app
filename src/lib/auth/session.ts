@@ -80,10 +80,10 @@ export async function requireApprovedUser(): Promise<UserRow> {
   return user;
 }
 
-/** Require an admin; non-admins are sent home, guests to login. */
+/** Require an admin; non-admins are sent to the app, guests to login. */
 export async function requireAdmin(): Promise<UserRow> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/");
+  if (user.role !== "admin") redirect("/app");
   return user;
 }

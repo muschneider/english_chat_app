@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage() {
   const user = await getCurrentUser();
   if (user) {
-    redirect(user.role === "admin" || user.status === "approved" ? "/" : "/pending");
+    redirect(user.role === "admin" || user.status === "approved" ? "/app" : "/pending");
   }
   return (
     <AuthShell title="Entrar" subtitle="Acesse sua conta para praticar inglês">

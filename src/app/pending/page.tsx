@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function PendingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role === "admin" || user.status === "approved") redirect("/");
+  if (user.role === "admin" || user.status === "approved") redirect("/app");
 
   const rejected = user.status === "rejected";
 

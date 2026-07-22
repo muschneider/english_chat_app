@@ -87,7 +87,7 @@ export default async function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/"
+            href="/app"
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
           >
             ← Ir ao tutor
