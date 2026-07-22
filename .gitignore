@@ -1,0 +1,49 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==========================================================
+# SECRETS - NEVER COMMIT THESE
+# OPENCODE_API_KEY and the Neon DATABASE_URL live in .env.local
+# ==========================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# drizzle (keep migrations, ignore local meta snapshots cache if any)
+/drizzle/.cache
+
+# ide / os
+.idea
+.vscode/*
+!.vscode/extensions.json
