@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import type { Toolkit } from "@/lib/ai/schema";
+import { TranslatableText } from "./TranslatableText";
 
 interface Props {
   toolkit: Toolkit;
   miniStructure: string | null;
   modelAnswer: string | null;
   defaultOpen?: boolean;
+  nativeLanguage: string;
 }
 
 function ChipRow({
@@ -44,6 +46,7 @@ export function SurvivalKit({
   miniStructure,
   modelAnswer,
   defaultOpen = false,
+  nativeLanguage,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -112,8 +115,19 @@ export function SurvivalKit({
 
           {hasTip && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm dark:border-amber-600/70 dark:bg-amber-950/60 dark:text-amber-100">
-              <span className="font-bold">💡 Grammar tip: </span>
-              {toolkit.grammarTip}
+              <p>
+                <span className="font-bold">💡 Grammar tip: </span>
+                {/* Translate only the EXPLANATORY tip. The vocabulary below */}
+                {/* (verbs, expressions, connectors) stays in English by */}
+                {/* design — it's what the learner is here to learn. */}
+                {toolkit.grammarTip}
+              </p>
+              <TranslatableText
+                text={toolkit.grammarTip ?? ""}
+                targetLang={nativeLanguage}
+                tone="amber"
+                label="dica"
+              />
             </div>
           )}
 

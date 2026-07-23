@@ -14,6 +14,7 @@ export default async function AppPage() {
         role: user.role,
         theme: user.theme,
         englishLevel: user.englishLevel,
+        nativeLanguage: user.nativeLanguage,
       }}
     />
   );

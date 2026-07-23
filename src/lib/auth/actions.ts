@@ -14,7 +14,12 @@ import {
   getCurrentUser,
   requireAdmin,
 } from "./session";
-import { englishLevelSchema, loginSchema, registerSchema } from "./validation";
+import {
+  englishLevelSchema,
+  loginSchema,
+  nativeLanguageSchema,
+  registerSchema,
+} from "./validation";
 import { setThemeCookie } from "@/lib/theme";
 import type { AuthFormState } from "./types";
 
@@ -28,12 +33,13 @@ export async function registerAction(
     email: formData.get("email"),
     password: formData.get("password"),
     englishLevel: formData.get("englishLevel"),
+    nativeLanguage: formData.get("nativeLanguage"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { name, email, password, englishLevel } = parsed.data;
+  const { name, email, password, englishLevel, nativeLanguage } = parsed.data;
 
   const existing = await db
     .select({ id: users.id })
@@ -47,7 +53,7 @@ export async function registerAction(
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(users)
-    .values({ name, email, passwordHash, englishLevel })
+    .values({ name, email, passwordHash, englishLevel, nativeLanguage })
     .returning();
 
   await createUserSession(user.id);
@@ -180,6 +186,30 @@ export async function updateEnglishLevelAction(
 
   revalidatePath("/settings");
   return { ok: true, level: normalized };
+}
+
+/**
+ * Update the learner's native language (used by the in-app translator for the
+ * tutor response, the feedback and the grammar tip). The change is global to
+ * the user, not per session — the next opened panel re-fetches the value.
+ */
+export async function updateNativeLanguageAction(
+  nativeLanguage: string,
+): Promise<{ ok: boolean; nativeLanguage: string } | { ok: false }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false };
+
+  const parsed = nativeLanguageSchema.safeParse(nativeLanguage);
+  if (!parsed.success) return { ok: false };
+  const normalized = parsed.data;
+
+  await db
+    .update(users)
+    .set({ nativeLanguage: normalized, updatedAt: new Date() })
+    .where(eq(users.id, user.id));
+
+  revalidatePath("/settings");
+  return { ok: true, nativeLanguage: normalized };
 }
 
 /** Delete one remembered fact about the current user (privacy / correction). */

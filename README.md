@@ -83,8 +83,13 @@ DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
 
 O app é protegido por login. O fluxo:
 
-1. **Cadastro** (`/register`) com nome, e-mail e senha → a conta nasce
-   **`pending`** (aguardando aprovação).
+1. **Cadastro** (`/register`) com nome, e-mail, senha, **nível de inglês** e
+   **língua nativa** (Português BR/PT, Espanhol, Francês, Alemão, Italiano,
+   Holandês, Polonês, Turco, Russo, Ucraniano, Grego, Tcheco, Romeno,
+   Húngaro, Sueco, Dinamarquês, Norueguês, Finlandês, Chinês, Japonês,
+   Coreano, Árabe, Hebraico, Persa, Hindi, Bengali, Urdu, Tailandês,
+   Vietnamita, Indonésio, Malaio, Filipino) → a conta nasce **`pending`**
+   (aguardando aprovação).
 2. Um **admin** aprova/rejeita em **`/admin`**. Só contas **`approved`** (ou o
    próprio admin) acessam o tutor.
 3. **Tema claro/escuro** é escolhido pelo botão no cabeçalho e fica salvo **por
@@ -160,17 +165,21 @@ src/
   app/
     api/chat/route.ts       # avança a conversa (resposta ou dica)
     api/session/route.ts    # cria (com tópico opcional) / carrega sessão
-    settings/page.tsx       # nível de inglês + memória do tutor
+    api/translate/route.ts  # traduz um trecho curto para a língua do aluno
+    settings/page.tsx       # nível de inglês + língua nativa + memória do tutor
     page.tsx, layout.tsx, globals.css
   components/                # ChatApp, MessageBubble, SurvivalKit, FeedbackCard,
                              # StuckHelp, PatternAlert, AssessmentCard,
-                             # TopicPicker, ChatInput...
+                             # TopicPicker, ChatInput, TranslatableText,
+                             # LanguageSettingsForm, LevelSettingsForm...
   lib/
     ai/
       provider.ts            # opencode Zen (Claude Sonnet 5)
       schema.ts              # schemas Zod (turno, memoryUpdates, assessment)
       prompt.ts              # persona + adaptação + perfil/memória + tópico
       teacher.ts             # chamada generateObject (com perfil + memórias)
+      translatePrompt.ts     # prompt focado do tradutor (lib/ai/translatePrompt.ts)
+    languages.ts             # lista de línguas nativas suportadas (código + label)
     db/
       schema.ts              # users, sessions, messages, error_patterns,
                              # user_memories
@@ -198,6 +207,15 @@ drizzle/                     # migrações SQL geradas
 - **Nível de inglês no cadastro + configurações** → coluna `users.english_level`
   (escolhido no `/register`, editável em `/settings`). Novas conversas começam
   nesse nível; o motor adaptativo continua ajustando durante o papo.
+- **Língua nativa + tradução sob demanda** → coluna `users.native_language`
+  (escolhida no `/register`, editável em `/settings`). A resposta do tutor,
+  o **feedback** (explicações e mensagem de encorajamento) e a **dica de
+  gramática** do Helpful Toolkit ganham um botão 🌐 que, ao ser clicado,
+  traduz aquele trecho para a língua do aluno via `/api/translate`
+  (`generateText` com prompt focado de tradução, cache client-side).
+  No Feedback e no Toolkit, **só a explicação é traduzida** — os verbos,
+  expressões, conectores, o par errado→correto e a versão "Like a native"
+  continuam em inglês (é o que o aluno está ali para aprender).
 - **Assunto aleatório (ou escolhido)** → `lib/topics.ts` (19 tópicos) +
   `TopicPicker.tsx` no botão "Nova". Sem escolha, sorteia um; o slug fica em
   `sessions.topic` e ancora a conversa (`prompt.ts`).

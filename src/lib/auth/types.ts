@@ -13,4 +13,6 @@ export type AppUser = {
   role: "admin" | "user";
   theme: "light" | "dark";
   englishLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  /** ISO 639-1 (with optional region) code for the learner's native language. */
+  nativeLanguage: string;
 };

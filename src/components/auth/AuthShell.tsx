@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CEFR_LEVELS, type CEFRLevel } from "@/lib/ai/schema";
 import { LEVEL_META } from "@/lib/levelMeta";
+import { DEFAULT_LANGUAGE, LANGUAGES } from "@/lib/languages";
 
 /** Centered card used by the login / register / pending pages. */
 export function AuthShell({
@@ -110,6 +111,48 @@ export function LevelSelectField({
             </option>
           );
         })}
+      </select>
+      {hint && (
+        <span className="mt-1.5 block text-xs text-slate-400 dark:text-slate-500">
+          {hint}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/**
+ * A labeled native-language picker used at registration and in settings. Renders
+ * as a native <select> so it works inside a plain server-action form (no client
+ * JS). The full list lives in `lib/languages`; we keep the wire format as the
+ * ISO code (e.g. `pt-BR`) so the stored value is stable and language-agnostic.
+ */
+export function LanguageSelectField({
+  name = "nativeLanguage",
+  label = "Sua língua nativa",
+  defaultValue = DEFAULT_LANGUAGE,
+  hint = "Usamos para traduzir a resposta do tutor, o feedback e a dica de gramática quando você pedir.",
+}: {
+  name?: string;
+  label?: string;
+  defaultValue?: string;
+  hint?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </span>
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-brand-500 dark:focus:ring-brand-900/60"
+      >
+        {LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code}>
+            {lang.flag} {lang.label}
+          </option>
+        ))}
       </select>
       {hint && (
         <span className="mt-1.5 block text-xs text-slate-400 dark:text-slate-500">

@@ -1,6 +1,13 @@
 import type { Feedback } from "@/lib/ai/schema";
+import { TranslatableText } from "./TranslatableText";
 
-export function FeedbackCard({ feedback }: { feedback: Feedback }) {
+export function FeedbackCard({
+  feedback,
+  nativeLanguage,
+}: {
+  feedback: Feedback;
+  nativeLanguage: string;
+}) {
   const hasCorrections = feedback.corrections.length > 0;
   const showCard =
     hasCorrections || feedback.nativeVersion || feedback.encouragement;
@@ -41,9 +48,17 @@ export function FeedbackCard({ feedback }: { feedback: Feedback }) {
                   {c.corrected}
                 </span>
               </div>
+              {/* Translate only the EXPLANATION. The wrong/correct English pair */}
+              {/* stays in English — that's the actual lesson. */}
               <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                 {c.explanation}
               </p>
+              <TranslatableText
+                text={c.explanation}
+                targetLang={nativeLanguage}
+                tone="emerald"
+                label="explicação"
+              />
             </li>
           ))}
         </ul>
@@ -57,9 +72,17 @@ export function FeedbackCard({ feedback }: { feedback: Feedback }) {
       )}
 
       {feedback.encouragement && (
-        <p className="mt-2.5 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-          {feedback.encouragement}
-        </p>
+        <div className="mt-2.5">
+          <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+            {feedback.encouragement}
+          </p>
+          <TranslatableText
+            text={feedback.encouragement}
+            targetLang={nativeLanguage}
+            tone="emerald"
+            label="feedback"
+          />
+        </div>
       )}
     </div>
   );

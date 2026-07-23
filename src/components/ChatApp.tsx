@@ -259,6 +259,7 @@ export function ChatApp({ user }: { user: AppUser }) {
               sessionId={sessionId}
               currentLevel={level}
               onLevelAccepted={setLevel}
+              nativeLanguage={user.nativeLanguage}
             />
           ))}
 

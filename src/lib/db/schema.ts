@@ -10,10 +10,17 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import type { TeacherTurn, CEFRLevel } from "@/lib/ai/schema";
+import { DEFAULT_LANGUAGE } from "@/lib/languages";
 
 export type UserRole = "admin" | "user";
 export type UserStatus = "pending" | "approved" | "rejected";
 export type Theme = "light" | "dark";
+/**
+ * ISO 639-1 (with optional region) code for the learner's native language.
+ * Used by the in-app translator so the learner can ask for translations of the
+ * tutor's words, the feedback and the grammar tip in their own language.
+ */
+export type NativeLanguage = string;
 
 /** Buckets used to organize durable facts the tutor remembers about a learner. */
 export type MemoryCategory =
@@ -46,6 +53,13 @@ export const users = pgTable("users", {
   englishLevel: varchar("english_level", { length: 4 })
     .$type<CEFRLevel>()
     .default("A2")
+    .notNull(),
+  // The learner's native language (ISO code). Chosen at registration and
+  // editable in settings. Drives the on-demand "translate to my language"
+  // button on the tutor response, the feedback and the grammar tip.
+  nativeLanguage: varchar("native_language", { length: 8 })
+    .$type<NativeLanguage>()
+    .default(DEFAULT_LANGUAGE)
     .notNull(),
   theme: varchar("theme", { length: 8 }).$type<Theme>().default("light").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

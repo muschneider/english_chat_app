@@ -7,6 +7,7 @@ import {
   AuthAltLink,
   ErrorNote,
   Field,
+  LanguageSelectField,
   LevelSelectField,
   SubmitButton,
 } from "./AuthShell";
@@ -43,6 +44,7 @@ export function RegisterForm() {
         required
       />
       <LevelSelectField />
+      <LanguageSelectField />
       {state?.error && <ErrorNote>{state.error}</ErrorNote>}
       <SubmitButton pending={pending}>Criar conta</SubmitButton>
       <AuthAltLink prompt="Já tem conta?" href="/login" label="Entrar" />

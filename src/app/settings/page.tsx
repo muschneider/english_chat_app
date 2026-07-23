@@ -6,6 +6,7 @@ import type { MemoryCategory, UserMemoryRow } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import { forgetMemoryAction, logoutAction } from "@/lib/auth/actions";
 import { LevelSettingsForm } from "@/components/LevelSettingsForm";
+import { LanguageSettingsForm } from "@/components/LanguageSettingsForm";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,14 @@ export default async function SettingsPage() {
           Nível de inglês
         </h2>
         <LevelSettingsForm initialLevel={user.englishLevel} />
+      </section>
+
+      {/* Native language (drives the in-app translator) */}
+      <section className="mb-8 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Língua nativa
+        </h2>
+        <LanguageSettingsForm initialLanguage={user.nativeLanguage} />
       </section>
 
       {/* Memory */}

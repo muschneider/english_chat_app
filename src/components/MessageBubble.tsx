@@ -7,6 +7,7 @@ import { SurvivalKit } from "./SurvivalKit";
 import { FeedbackCard } from "./FeedbackCard";
 import { PatternAlert } from "./PatternAlert";
 import { AssessmentCard } from "./AssessmentCard";
+import { TranslatableText } from "./TranslatableText";
 
 function SpeakButton({ text }: { text: string }) {
   const [speaking, setSpeaking] = useState(false);
@@ -50,12 +51,14 @@ export function MessageBubble({
   sessionId = null,
   currentLevel,
   onLevelAccepted,
+  nativeLanguage,
 }: {
   message: ClientMessage;
   isLatestTeacher: boolean;
   sessionId?: string | null;
   currentLevel?: CEFRLevel;
   onLevelAccepted?: (level: CEFRLevel) => void;
+  nativeLanguage: string;
 }) {
   if (message.role === "user") {
     return (
@@ -73,7 +76,9 @@ export function MessageBubble({
 
   return (
     <div className="animate-bubble-in space-y-2">
-      {payload?.feedback && <FeedbackCard feedback={payload.feedback} />}
+      {payload?.feedback && (
+        <FeedbackCard feedback={payload.feedback} nativeLanguage={nativeLanguage} />
+      )}
       {payload?.detectedPattern && (
         <PatternAlert pattern={payload.detectedPattern} />
       )}
@@ -96,7 +101,17 @@ export function MessageBubble({
               {message.content}
             </p>
           </div>
-          <SpeakButton text={message.content} />
+          <div className="mt-1">
+            <TranslatableText
+              text={message.content}
+              targetLang={nativeLanguage}
+              tone="sky"
+              label="tutor"
+            />
+          </div>
+          <div className="mt-1">
+            <SpeakButton text={message.content} />
+          </div>
 
           {payload && (
             <SurvivalKit
@@ -104,6 +119,7 @@ export function MessageBubble({
               miniStructure={payload.miniStructure}
               modelAnswer={payload.modelAnswer}
               defaultOpen={isLatestTeacher}
+              nativeLanguage={nativeLanguage}
             />
           )}
         </div>
