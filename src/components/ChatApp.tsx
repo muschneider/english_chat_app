@@ -38,36 +38,59 @@ export function ChatApp({ user }: { user: AppUser }) {
   }, [messages, sending, stuck, scrollToBottom]);
 
   // Boot: resume an existing session or create a new one.
+  //
+  // The conversation is tied to the USER, not to the device:
+  //  1. If this device has a pinned session id in localStorage, use it (fast
+  //     path — keeps the device's "active" chat stable across reloads).
+  //  2. Otherwise, ask the server for the user's most recent conversation.
+  //     This is what makes the chat follow the learner across devices — on
+  //     a phone that has never seen this app before, the tutor picks up
+  //     exactly where it left off on the computer.
+  //  3. Only when the user has no conversations at all do we create a new one.
   useEffect(() => {
     let cancelled = false;
 
     async function boot() {
       const existing = localStorage.getItem(STORAGE_KEY);
-      try {
-        if (existing) {
-          const res = await fetch(`/api/session?id=${existing}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (!cancelled) {
-              setSessionId(data.session.id);
-              setLevel(data.session.currentLevel);
-              setMessages(data.messages);
-              setBooting(false);
-            }
-            return;
-          }
-          localStorage.removeItem(STORAGE_KEY);
-        }
-        await startNewSession(undefined, cancelled);
-      } catch {
-        if (!cancelled) {
-          setError("Could not start the tutor. Check your connection and refresh.");
+
+      if (existing) {
+        const res = await fetch(`/api/session?id=${existing}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (cancelled) return;
+          setSessionId(data.session.id);
+          setLevel(data.session.currentLevel);
+          setMessages(data.messages);
           setBooting(false);
+          return;
         }
+        // The pinned id is gone (deleted, or belongs to another user) — drop it.
+        localStorage.removeItem(STORAGE_KEY);
       }
+
+      // Resume the user's most recent conversation from the server.
+      const latest = await fetch("/api/session");
+      if (latest.ok) {
+        const data = await latest.json();
+        if (cancelled) return;
+        localStorage.setItem(STORAGE_KEY, data.session.id);
+        setSessionId(data.session.id);
+        setLevel(data.session.currentLevel);
+        setMessages(data.messages);
+        setBooting(false);
+        return;
+      }
+
+      // First time ever: create a new session.
+      await startNewSession(undefined, cancelled);
     }
 
-    boot();
+    boot().catch(() => {
+      if (!cancelled) {
+        setError("Could not start the tutor. Check your connection and refresh.");
+        setBooting(false);
+      }
+    });
     return () => {
       cancelled = true;
     };

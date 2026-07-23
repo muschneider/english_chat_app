@@ -196,6 +196,35 @@ export async function getSession(
   return { session, messages: rows.map(toClientMessage) };
 }
 
+/**
+ * Fetch the user's most recently updated session with its full transcript.
+ * Used on cold boot (no localStorage hint) so the same conversation follows
+ * the learner across devices (computer, phone, tablet). Returns null if the
+ * user has never started a conversation.
+ */
+export async function getLatestSessionForUser(
+  userId: string,
+): Promise<{
+  session: SessionRow;
+  messages: ClientMessage[];
+} | null> {
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.userId, userId))
+    .orderBy(desc(sessions.updatedAt))
+    .limit(1);
+  if (!session) return null;
+
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.sessionId, session.id))
+    .orderBy(asc(messages.createdAt));
+
+  return { session, messages: rows.map(toClientMessage) };
+}
+
 export interface AdvanceArgs {
   sessionId: string;
   userId: string;

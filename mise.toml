@@ -54,6 +54,10 @@ run = "npm run db:apply"
 description = "Create/ensure the admin (set ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD)"
 run = "npm run db:seed"
 
+[tasks."db:reset-conversations"]
+description = "Wipe all sessions/messages/error_patterns (requires CONFIRM=YES)"
+run = "node --env-file=.env.local scripts/reset-conversations.ts"
+
 [tasks."db:studio"]
 description = "Open Drizzle Studio to inspect the database"
 run = "npm run db:studio"

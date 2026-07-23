@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createSession, getSession } from "@/lib/services/conversation";
+import {
+  createSession,
+  getLatestSessionForUser,
+  getSession,
+} from "@/lib/services/conversation";
 import { getCurrentUser } from "@/lib/auth/session";
 import type { UserRow } from "@/lib/db/schema";
 import { isTopicSlug } from "@/lib/topics";
@@ -60,18 +64,35 @@ export async function POST(request: Request) {
   }
 }
 
-/** GET /api/session?id=... -> load an existing conversation transcript. */
+/** GET /api/session?id=... -> load a specific conversation transcript. */
 export async function GET(request: Request) {
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ error: "Missing session id." }, { status: 400 });
-  }
 
   try {
+    // No id: resume the user's most recent conversation. This is what makes
+    // the chat follow the learner across devices (computer, phone, tablet):
+    // on a fresh device with no localStorage, we still pick up where they
+    // left off instead of starting a brand-new session.
+    if (!id) {
+      const result = await getLatestSessionForUser(auth.user.id);
+      if (!result) {
+        return NextResponse.json({ error: "No session yet." }, { status: 404 });
+      }
+      return NextResponse.json({
+        session: {
+          id: result.session.id,
+          title: result.session.title,
+          currentLevel: result.session.currentLevel,
+          topic: result.session.topic,
+        },
+        messages: result.messages,
+      });
+    }
+
     const result = await getSession(id, auth.user.id);
     if (!result) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
