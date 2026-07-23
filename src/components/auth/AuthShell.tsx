@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CEFR_LEVELS, type CEFRLevel } from "@/lib/ai/schema";
+import { LEVEL_META } from "@/lib/levelMeta";
 
 /** Centered card used by the login / register / pending pages. */
 export function AuthShell({
@@ -71,6 +73,49 @@ export function Field({
         defaultValue={defaultValue}
         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-500 dark:focus:ring-brand-900/60"
       />
+    </label>
+  );
+}
+
+/**
+ * A labeled CEFR level picker used at registration and in settings. Renders as a
+ * native <select> so it works inside a plain server-action form (no client JS).
+ */
+export function LevelSelectField({
+  name = "englishLevel",
+  label = "Seu nível de inglês",
+  defaultValue = "A2",
+  hint = "Você pode mudar depois nas configurações.",
+}: {
+  name?: string;
+  label?: string;
+  defaultValue?: CEFRLevel;
+  hint?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </span>
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-brand-500 dark:focus:ring-brand-900/60"
+      >
+        {CEFR_LEVELS.map((level) => {
+          const meta = LEVEL_META[level];
+          return (
+            <option key={level} value={level}>
+              {level} · {meta.label}
+            </option>
+          );
+        })}
+      </select>
+      {hint && (
+        <span className="mt-1.5 block text-xs text-slate-400 dark:text-slate-500">
+          {hint}
+        </span>
+      )}
     </label>
   );
 }

@@ -5,6 +5,55 @@ export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 export const cefrLevelSchema = z.enum(CEFR_LEVELS);
 export type CEFRLevel = (typeof CEFR_LEVELS)[number];
 
+/** Categories used to file the durable facts the tutor remembers about a learner. */
+export const MEMORY_CATEGORIES = [
+  "personal",
+  "family",
+  "work",
+  "education",
+  "preferences",
+  "goals",
+  "health",
+  "other",
+] as const;
+
+/** A durable fact about the learner to remember across sessions. */
+export const memoryUpdateSchema = z.object({
+  key: z
+    .string()
+    .describe(
+      "A stable snake_case slug identifying this durable fact, e.g. 'spouse', 'children', 'job', 'employer', 'city', 'hometown', 'pet', 'english_goal'. REUSE the same key to overwrite a fact that changed (e.g. moved city).",
+    ),
+  fact: z
+    .string()
+    .describe(
+      "A short third-person statement of the fact, e.g. 'Is married to Maria', 'Works as a nurse', 'Lives in São Paulo', 'Has a dog named Rex'.",
+    ),
+  category: z.enum(MEMORY_CATEGORIES).describe("Which bucket this fact belongs to."),
+});
+export type MemoryUpdate = z.infer<typeof memoryUpdateSchema>;
+
+/** A periodic, honest estimate of the learner's CEFR level. */
+export const assessmentSchema = z
+  .object({
+    estimatedLevel: cefrLevelSchema.describe(
+      "Your honest overall CEFR estimate of the learner based on the whole conversation so far.",
+    ),
+    summary: z
+      .string()
+      .describe(
+        "2-3 warm, encouraging sentences explaining the estimate in simple English.",
+      ),
+    strengths: z
+      .array(z.string())
+      .describe("2-3 concrete things the learner already does well."),
+    focusAreas: z
+      .array(z.string())
+      .describe("2-3 concrete, actionable things to improve next."),
+  })
+  .nullable();
+export type Assessment = z.infer<typeof assessmentSchema>;
+
 /** A single grammar/vocabulary correction of the learner's previous message. */
 export const correctionSchema = z.object({
   errorType: z
@@ -136,5 +185,13 @@ export const teacherTurnSchema = z.object({
     .describe(
       "Whether the learner's level should nudge up (doing well), down (struggling), or stay.",
     ),
+  memoryUpdates: z
+    .array(memoryUpdateSchema)
+    .describe(
+      "Durable personal facts about the LEARNER revealed in their latest message that must be remembered across sessions (spouse, children, job, employer, city, pets, goals, strong likes/dislikes…). Empty array when nothing durable was revealed. Do NOT store transient small talk or facts about other people unrelated to the learner.",
+    ),
+  assessment: assessmentSchema.describe(
+    "A fresh CEFR level assessment. Fill this ONLY when the tutor state says it is assessment time; otherwise null. Never mention the assessment inside 'conversation'.",
+  ),
 });
 export type TeacherTurn = z.infer<typeof teacherTurnSchema>;

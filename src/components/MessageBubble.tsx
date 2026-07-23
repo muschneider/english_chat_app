@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { CEFRLevel } from "@/lib/ai/schema";
 import type { ClientMessage } from "@/lib/services/conversation";
 import { SurvivalKit } from "./SurvivalKit";
 import { FeedbackCard } from "./FeedbackCard";
 import { PatternAlert } from "./PatternAlert";
+import { AssessmentCard } from "./AssessmentCard";
 
 function SpeakButton({ text }: { text: string }) {
   const [speaking, setSpeaking] = useState(false);
@@ -45,9 +47,15 @@ function SpeakButton({ text }: { text: string }) {
 export function MessageBubble({
   message,
   isLatestTeacher,
+  sessionId = null,
+  currentLevel,
+  onLevelAccepted,
 }: {
   message: ClientMessage;
   isLatestTeacher: boolean;
+  sessionId?: string | null;
+  currentLevel?: CEFRLevel;
+  onLevelAccepted?: (level: CEFRLevel) => void;
 }) {
   if (message.role === "user") {
     return (
@@ -68,6 +76,14 @@ export function MessageBubble({
       {payload?.feedback && <FeedbackCard feedback={payload.feedback} />}
       {payload?.detectedPattern && (
         <PatternAlert pattern={payload.detectedPattern} />
+      )}
+      {payload?.assessment && (
+        <AssessmentCard
+          assessment={payload.assessment}
+          currentLevel={currentLevel ?? payload.assessment.estimatedLevel}
+          sessionId={sessionId}
+          onLevelAccepted={onLevelAccepted}
+        />
       )}
 
       <div className="flex items-start gap-3">

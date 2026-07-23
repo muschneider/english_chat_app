@@ -159,20 +159,24 @@ As rotas de API declaram `maxDuration = 60`, suficiente para a chamada do LLM
 src/
   app/
     api/chat/route.ts       # avança a conversa (resposta ou dica)
-    api/session/route.ts    # cria/carrega sessão
+    api/session/route.ts    # cria (com tópico opcional) / carrega sessão
+    settings/page.tsx       # nível de inglês + memória do tutor
     page.tsx, layout.tsx, globals.css
-  components/                # ChatApp, MessageBubble, SurvivalKit,
-                             # FeedbackCard, StuckHelp, PatternAlert, ChatInput...
+  components/                # ChatApp, MessageBubble, SurvivalKit, FeedbackCard,
+                             # StuckHelp, PatternAlert, AssessmentCard,
+                             # TopicPicker, ChatInput...
   lib/
     ai/
       provider.ts            # opencode Zen (Claude Sonnet 5)
-      schema.ts              # schemas Zod da saída do professor
-      prompt.ts              # persona + lógica adaptativa (A1–C2)
-      teacher.ts             # chamada generateObject
+      schema.ts              # schemas Zod (turno, memoryUpdates, assessment)
+      prompt.ts              # persona + adaptação + perfil/memória + tópico
+      teacher.ts             # chamada generateObject (com perfil + memórias)
     db/
-      schema.ts              # sessions, messages, error_patterns
+      schema.ts              # users, sessions, messages, error_patterns,
+                             # user_memories
       index.ts               # cliente Drizzle + Neon (lazy)
-    services/conversation.ts # orquestra IA + banco + evolução de nível
+    services/conversation.ts # orquestra IA + banco + nível + memória + avaliação
+    topics.ts                # 19 tópicos (slug/pt/en) + sorteio
     levels.ts, levelMeta.ts
 drizzle/                     # migrações SQL geradas
 ```
@@ -191,3 +195,20 @@ drizzle/                     # migrações SQL geradas
   `conversation.ts` (contagem por `errorType`) + `PatternAlert.tsx`.
 - **Travou? Ajuda em 3 níveis** → botão "I'm stuck" → `stuckHelp` → `StuckHelp.tsx`.
 - **Voz** → Web Speech API (mic e "listen"), client-side, com fallback.
+- **Nível de inglês no cadastro + configurações** → coluna `users.english_level`
+  (escolhido no `/register`, editável em `/settings`). Novas conversas começam
+  nesse nível; o motor adaptativo continua ajustando durante o papo.
+- **Assunto aleatório (ou escolhido)** → `lib/topics.ts` (19 tópicos) +
+  `TopicPicker.tsx` no botão "Nova". Sem escolha, sorteia um; o slug fica em
+  `sessions.topic` e ancora a conversa (`prompt.ts`).
+- **Avaliação periódica de nível** → a cada 6 respostas (`turns_since_assessment`)
+  o professor devolve `assessment` (nível estimado + pontos fortes/focos) →
+  `AssessmentCard.tsx`, com botão para aplicar a sugestão.
+- **Memória de longo prazo** → tabela `user_memories` (escopo por **usuário**, não
+  por conversa). O professor extrai fatos duráveis (`memoryUpdates`) e eles são
+  reinjetados no prompt em toda sessão — então ele lembra quem é a esposa mesmo
+  um mês depois. Gerenciável em `/settings`.
+
+> **Após atualizar:** aplique a migração nova no Neon uma vez —
+> `mise run db:apply` (ou `mise run db:push`). Ela só adiciona colunas/tabela
+> (aditiva, sem perda de dados).

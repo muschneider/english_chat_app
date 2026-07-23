@@ -3,7 +3,13 @@
 import { useActionState } from "react";
 import { registerAction } from "@/lib/auth/actions";
 import type { AuthFormState } from "@/lib/auth/types";
-import { AuthAltLink, ErrorNote, Field, SubmitButton } from "./AuthShell";
+import {
+  AuthAltLink,
+  ErrorNote,
+  Field,
+  LevelSelectField,
+  SubmitButton,
+} from "./AuthShell";
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
@@ -36,6 +42,7 @@ export function RegisterForm() {
         placeholder="Mínimo de 8 caracteres"
         required
       />
+      <LevelSelectField />
       {state?.error && <ErrorNote>{state.error}</ErrorNote>}
       <SubmitButton pending={pending}>Criar conta</SubmitButton>
       <AuthAltLink prompt="Já tem conta?" href="/login" label="Entrar" />

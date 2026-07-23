@@ -1,15 +1,36 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { ModelMessage } from "ai";
 import { db } from "@/lib/db";
-import { sessions, messages, errorPatterns } from "@/lib/db/schema";
-import type { MessageRow, SessionRow } from "@/lib/db/schema";
+import {
+  sessions,
+  messages,
+  errorPatterns,
+  users,
+  userMemories,
+} from "@/lib/db/schema";
+import type {
+  MessageRow,
+  SessionRow,
+  UserMemoryRow,
+  UserRow,
+} from "@/lib/db/schema";
 import { generateTeacherTurn } from "@/lib/ai/teacher";
-import type { TeacherTurn } from "@/lib/ai/schema";
-import type { TurnContext } from "@/lib/ai/prompt";
+import type { MemoryUpdate, TeacherTurn } from "@/lib/ai/schema";
+import type { LearnerProfile, TurnContext } from "@/lib/ai/prompt";
 import { shiftLevel, nextErrorScore } from "@/lib/levels";
+import {
+  isTopicSlug,
+  randomTopicSlug,
+  topicEnLabel,
+  topicPtLabel,
+} from "@/lib/topics";
 
 const HISTORY_LIMIT = 24;
 const PATTERN_THRESHOLD = 3;
+/** Run a fresh level assessment every N learner replies. */
+const ASSESSMENT_INTERVAL = 6;
+/** Cap on how many durable facts we inject into the prompt each turn. */
+const MEMORY_LIMIT = 80;
 
 export interface ClientMessage {
   id: string;
@@ -44,20 +65,88 @@ async function loadErrorTally(sessionId: string) {
   return rows;
 }
 
+async function loadUser(userId: string): Promise<UserRow | null> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  return user ?? null;
+}
+
+function toProfile(user: UserRow): LearnerProfile {
+  return { name: user.name, selfLevel: user.englishLevel };
+}
+
+/** All durable facts the tutor knows about this learner (most recent first). */
+async function loadUserMemories(userId: string): Promise<UserMemoryRow[]> {
+  return db
+    .select()
+    .from(userMemories)
+    .where(eq(userMemories.userId, userId))
+    .orderBy(desc(userMemories.updatedAt))
+    .limit(MEMORY_LIMIT);
+}
+
+/**
+ * Persist durable facts the tutor extracted this turn. Keyed by (userId, key)
+ * so a changed fact (e.g. moved city) overwrites the previous value instead of
+ * piling up duplicates.
+ */
+async function upsertUserMemories(userId: string, updates: MemoryUpdate[]) {
+  for (const update of updates) {
+    const key = update.key.trim().slice(0, 64);
+    const fact = update.fact.trim().slice(0, 500);
+    if (!key || !fact) continue;
+
+    await db
+      .insert(userMemories)
+      .values({ userId, key, fact, category: update.category })
+      .onConflictDoUpdate({
+        target: [userMemories.userId, userMemories.key],
+        set: { fact, category: update.category, updatedAt: new Date() },
+      });
+  }
+}
+
+export interface CreateSessionOptions {
+  /** A topic slug the learner picked; when absent/invalid a random one is used. */
+  topic?: string;
+}
+
 /** Create a brand new session (owned by `userId`) and generate the opening turn. */
-export async function createSession(userId: string): Promise<{
+export async function createSession(
+  userId: string,
+  options: CreateSessionOptions = {},
+): Promise<{
   session: SessionRow;
   message: ClientMessage;
 }> {
-  const [session] = await db.insert(sessions).values({ userId }).returning();
+  const user = await loadUser(userId);
+  if (!user) throw new Error("User not found for new session.");
+
+  // The learner's self-declared level is the starting point; the adaptive
+  // engine drifts from there as the conversation progresses.
+  const startingLevel = user.englishLevel;
+  // A conversation opens on the chosen topic, or a random one for variety.
+  const topicSlug = isTopicSlug(options.topic) ? options.topic : randomTopicSlug();
+
+  const memories = await loadUserMemories(userId);
+
+  const [session] = await db
+    .insert(sessions)
+    .values({ userId, currentLevel: startingLevel, topic: topicSlug })
+    .returning();
 
   const context: TurnContext = {
     intent: "start",
-    currentLevel: session.currentLevel,
+    currentLevel: startingLevel,
     recentErrorScore: session.recentErrorScore,
+    topic: topicEnLabel(topicSlug),
   };
 
-  const turn = await generateTeacherTurn({ history: [], context });
+  const turn = await generateTeacherTurn({
+    history: [],
+    context,
+    profile: toProfile(user),
+    memories,
+  });
 
   const [teacherRow] = await db
     .insert(messages)
@@ -69,11 +158,13 @@ export async function createSession(userId: string): Promise<{
     })
     .returning();
 
+  // Keep the opening level anchored to the learner's self-declared level (the
+  // model has no evidence yet on turn 1); adaptation kicks in from real replies.
   const [updated] = await db
     .update(sessions)
     .set({
-      currentLevel: turn.level,
-      title: turn.topic || session.title,
+      currentLevel: startingLevel,
+      title: topicPtLabel(topicSlug),
       updatedAt: new Date(),
     })
     .where(eq(sessions.id, session.id))
@@ -136,6 +227,13 @@ export async function advanceConversation(
     .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
   if (!session) return null;
 
+  const user = await loadUser(userId);
+  if (!user) return null;
+
+  const profile = toProfile(user);
+  const memories = await loadUserMemories(userId);
+  const topicLabel = topicEnLabel(session.topic);
+
   // Recent transcript for the model (chronological).
   const recentRows = (
     await db
@@ -169,8 +267,11 @@ export async function advanceConversation(
         currentLevel: session.currentLevel,
         recentErrorScore: session.recentErrorScore,
         hintLevel,
+        topic: topicLabel,
         errorTally,
       },
+      profile,
+      memories,
     });
 
     return {
@@ -199,12 +300,17 @@ export async function advanceConversation(
       .filter((t) => t.count >= PATTERN_THRESHOLD)
       .sort((a, b) => b.count - a.count)[0] ?? null;
 
+  // Time for a periodic level assessment?
+  const assessmentDue = session.turnsSinceAssessment + 1 >= ASSESSMENT_INTERVAL;
+
   const turn = await generateTeacherTurn({
     history,
     context: {
       intent: "reply",
       currentLevel: session.currentLevel,
       recentErrorScore: session.recentErrorScore,
+      topic: topicLabel,
+      assessmentDue,
       errorTally,
       patternToDrill: patternToDrill
         ? {
@@ -214,6 +320,8 @@ export async function advanceConversation(
           }
         : null,
     },
+    profile,
+    memories,
   });
 
   // Persist the teacher's structured turn.
@@ -231,6 +339,9 @@ export async function advanceConversation(
   const corrections = turn.feedback?.corrections ?? [];
   await upsertErrorPatterns(sessionId, corrections);
 
+  // Remember any durable facts the learner revealed this turn.
+  await upsertUserMemories(userId, turn.memoryUpdates ?? []);
+
   // If we drilled a pattern this turn, clear its counter.
   if (turn.detectedPattern && patternToDrill) {
     await db
@@ -247,13 +358,17 @@ export async function advanceConversation(
   // Adaptive level + rolling error score.
   const newLevel = shiftLevel(session.currentLevel, turn.suggestedLevelChange);
   const newScore = nextErrorScore(session.recentErrorScore, corrections.length);
+  // Advance the assessment cadence; reset it whenever an assessment was produced.
+  const newTurnsSinceAssessment = turn.assessment
+    ? 0
+    : session.turnsSinceAssessment + 1;
 
   const [updatedSession] = await db
     .update(sessions)
     .set({
       currentLevel: newLevel,
       recentErrorScore: newScore,
-      title: turn.topic || session.title,
+      turnsSinceAssessment: newTurnsSinceAssessment,
       updatedAt: new Date(),
     })
     .where(eq(sessions.id, sessionId))

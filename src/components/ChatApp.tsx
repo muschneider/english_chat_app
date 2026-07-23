@@ -12,13 +12,14 @@ import { ChatInput } from "./ChatInput";
 import { StuckHelp } from "./StuckHelp";
 import { LevelBadge } from "./LevelBadge";
 import { ThemeToggle } from "./ThemeToggle";
+import { TopicPicker } from "./TopicPicker";
 
 const STORAGE_KEY = "english-tutor-session-id";
 
 export function ChatApp({ user }: { user: AppUser }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ClientMessage[]>([]);
-  const [level, setLevel] = useState<CEFRLevel>("A2");
+  const [level, setLevel] = useState<CEFRLevel>(user.englishLevel);
   const [booting, setBooting] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export function ChatApp({ user }: { user: AppUser }) {
           }
           localStorage.removeItem(STORAGE_KEY);
         }
-        await startNewSession(cancelled);
+        await startNewSession(undefined, cancelled);
       } catch {
         if (!cancelled) {
           setError("Could not start the tutor. Check your connection and refresh.");
@@ -73,12 +74,16 @@ export function ChatApp({ user }: { user: AppUser }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function startNewSession(cancelled = false) {
+  async function startNewSession(topic?: string, cancelled = false) {
     setBooting(true);
     setError(null);
     setStuck(null);
     setHintLevel(0);
-    const res = await fetch("/api/session", { method: "POST" });
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(topic ? { topic } : {}),
+    });
     if (!res.ok) throw new Error("failed to create session");
     const data = await res.json();
     if (cancelled) return;
@@ -89,11 +94,11 @@ export function ChatApp({ user }: { user: AppUser }) {
     setBooting(false);
   }
 
-  const handleNewConversation = async () => {
+  const handleNewConversation = async (topic?: string) => {
     if (sending || booting) return;
     setMessages([]);
     try {
-      await startNewSession();
+      await startNewSession(topic);
     } catch {
       setError("Could not start a new conversation.");
       setBooting(false);
@@ -183,6 +188,21 @@ export function ChatApp({ user }: { user: AppUser }) {
 
           <ThemeToggle initial={user.theme} />
 
+          <Link
+            href="/settings"
+            title="Configurações"
+            aria-label="Configurações"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <path
+                fillRule="evenodd"
+                d="M8.34 1.804A1 1 0 019.32 1h1.36a1 1 0 01.98.804l.295 1.473c.497.144.97.34 1.409.582l1.25-.834a1 1 0 011.271.124l.962.962a1 1 0 01.124 1.272l-.834 1.25c.242.44.438.912.582 1.408l1.473.296a1 1 0 01.804.98v1.36a1 1 0 01-.804.98l-1.473.295a6.95 6.95 0 01-.582 1.409l.834 1.25a1 1 0 01-.124 1.271l-.962.962a1 1 0 01-1.272.124l-1.25-.834c-.44.242-.912.438-1.408.582l-.296 1.473a1 1 0 01-.98.804H9.32a1 1 0 01-.98-.804l-.295-1.473a6.957 6.957 0 01-1.409-.582l-1.25.834a1 1 0 01-1.271-.124l-.962-.962a1 1 0 01-.124-1.272l.834-1.25a6.957 6.957 0 01-.582-1.408l-1.473-.296A1 1 0 011 10.68V9.32a1 1 0 01.804-.98l1.473-.295c.144-.497.34-.97.582-1.409l-.834-1.25a1 1 0 01.124-1.271l.962-.962A1 1 0 015.383 3.03l1.25.834c.44-.242.912-.438 1.408-.582l.296-1.473zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </Link>
+
           {user.role === "admin" && (
             <Link
               href="/admin"
@@ -196,15 +216,7 @@ export function ChatApp({ user }: { user: AppUser }) {
             </Link>
           )}
 
-          <button
-            type="button"
-            onClick={handleNewConversation}
-            disabled={sending || booting}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="Start a fresh conversation"
-          >
-            New
-          </button>
+          <TopicPicker onStart={handleNewConversation} disabled={sending || booting} />
 
           <div
             className="hidden h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 sm:grid dark:bg-brand-900/50 dark:text-brand-200"
@@ -244,6 +256,9 @@ export function ChatApp({ user }: { user: AppUser }) {
               key={m.id}
               message={m}
               isLatestTeacher={m.id === lastTeacherId}
+              sessionId={sessionId}
+              currentLevel={level}
+              onLevelAccepted={setLevel}
             />
           ))}
 

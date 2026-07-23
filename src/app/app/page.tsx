@@ -13,6 +13,7 @@ export default async function AppPage() {
         email: user.email,
         role: user.role,
         theme: user.theme,
+        englishLevel: user.englishLevel,
       }}
     />
   );

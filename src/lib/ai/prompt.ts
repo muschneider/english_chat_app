@@ -1,4 +1,5 @@
 import type { CEFRLevel } from "./schema";
+import type { UserMemoryRow } from "@/lib/db/schema";
 
 /**
  * The adaptive English tutor persona. This encodes the full pedagogy:
@@ -81,14 +82,38 @@ vocabulary, add phrasal verbs and idioms, and go deeper. If they start making
 many mistakes again, increase support. Use 'suggestedLevelChange' = 'up',
 'down', or 'same' to signal the drift.
 
-TOPICS: naturally rotate across work, travel, gym/fitness, business, technology,
-movies, books, routine, food, culture, hobbies, entrepreneurship, finance,
-philosophy, psychology, family, dreams, and goals. Do not get stuck on one.
+TOPIC: each conversation has a CHOSEN subject given to you in the tutor state
+('conversation_topic'). Open on that subject and keep the conversation anchored
+to it, exploring its sub-themes naturally. Do not drift into unrelated topics
+unless the learner clearly steers there.
+
+LEARNER MEMORY (long-term): The tutor state may include a 'WHAT YOU KNOW ABOUT
+THIS LEARNER' block with durable facts from earlier sessions (possibly weeks
+ago). Treat those facts as true and use them naturally to personalize the chat.
+If the learner asks about something you know (e.g. "who is my wife?", "what's my
+dog's name?"), answer directly from that memory. Whenever the learner reveals or
+changes a durable personal fact (name, spouse/partner, children, job, employer,
+city, hometown, pets, big goals, strong likes/dislikes), record it in
+'memoryUpdates' with a stable snake_case 'key' so it is remembered forever. Reuse
+the same key to overwrite a fact that changed. Leave 'memoryUpdates' empty when
+nothing durable was revealed. Never store passwords, card numbers or other
+sensitive secrets.
+
+LEVEL ASSESSMENT (periodic): Usually leave 'assessment' null. ONLY when the tutor
+state says 'assessment_due', step back and honestly evaluate the learner's whole
+performance so far and fill 'assessment' (estimatedLevel + a warm summary +
+concrete strengths + focus areas). Even on an assessment turn, still continue the
+conversation normally in 'conversation' and DO NOT read the assessment out loud —
+it is shown to the learner in its own panel.
+
+TOPICS you may reference across sessions: work, travel, gym/fitness, business,
+technology, movies, books, routine, food, culture, hobbies, entrepreneurship,
+finance, philosophy, psychology, family, dreams, goals, and job interviews.
 
 OUTPUT: always return the structured object. Put ONLY spoken English in
-'conversation'. Never include meta-instructions or the raw kit inside
-'conversation' — the kit, structure, model answer and feedback are shown to the
-learner in their own UI panels.
+'conversation'. Never include meta-instructions, the raw kit, memory notes or the
+assessment inside 'conversation' — the kit, structure, model answer, feedback,
+memory and assessment are handled in their own UI panels.
 `.trim();
 
 export interface TurnContext {
@@ -96,10 +121,50 @@ export interface TurnContext {
   currentLevel: CEFRLevel;
   recentErrorScore: number;
   hintLevel?: number;
+  /** The chosen subject of this conversation (English label from lib/topics). */
+  topic?: string;
+  /** When true, the model should produce a fresh level assessment this turn. */
+  assessmentDue?: boolean;
   /** error slugs that have reached the drill threshold and were not yet drilled */
   patternToDrill?: { errorType: string; label: string; count: number } | null;
   /** running tallies so the model knows which errors are recurring */
   errorTally?: Array<{ errorType: string; label: string; count: number }>;
+}
+
+/** Identity passed to the model so it always knows who it is talking to. */
+export interface LearnerProfile {
+  name: string;
+  selfLevel: CEFRLevel;
+}
+
+/**
+ * A persistent block describing WHO the learner is and everything durable the
+ * tutor has learned about them (across all sessions). Prepended to the system
+ * prompt on every turn so knowledge never gets lost between conversations.
+ */
+export function buildProfileBlock(
+  profile: LearnerProfile,
+  memories: UserMemoryRow[],
+): string {
+  const lines: string[] = [];
+  lines.push(`[WHO YOU KNOW ABOUT THIS LEARNER]`);
+  lines.push(`name: ${profile.name}`);
+  lines.push(`self_declared_level: ${profile.selfLevel}`);
+
+  if (memories.length > 0) {
+    lines.push(
+      `Known durable facts (remember and use naturally; answer the learner from these if asked):`,
+    );
+    for (const m of memories) {
+      lines.push(`- ${m.key} [${m.category}]: ${m.fact}`);
+    }
+  } else {
+    lines.push(
+      `No durable facts recorded yet. Capture them in 'memoryUpdates' as the learner reveals them.`,
+    );
+  }
+
+  return lines.join("\n");
 }
 
 /**
@@ -112,6 +177,10 @@ export function buildContextBlock(ctx: TurnContext): string {
   lines.push(`current_level: ${ctx.currentLevel}`);
   lines.push(`recent_error_score: ${ctx.recentErrorScore} (higher = struggling)`);
 
+  if (ctx.topic) {
+    lines.push(`conversation_topic: ${ctx.topic}`);
+  }
+
   if (ctx.errorTally && ctx.errorTally.length > 0) {
     const tally = ctx.errorTally
       .map((e) => `${e.errorType}=${e.count}`)
@@ -120,16 +189,23 @@ export function buildContextBlock(ctx: TurnContext): string {
   }
 
   if (ctx.intent === "start") {
+    const about = ctx.topic ? ` about ${ctx.topic}` : "";
     lines.push(
-      `task: Begin the conversation. There is no learner message yet, so feedback=null. Pick a specific, contextual opening question and scaffold it for ${ctx.currentLevel}.`,
+      `task: Begin the conversation${about}. There is no learner message yet, so feedback=null and assessment=null. Ask a specific, contextual opening question on this topic and scaffold it for ${ctx.currentLevel}.`,
     );
   } else if (ctx.intent === "hint") {
     lines.push(
-      `task: The learner is STUCK and asked for help at hintLevel=${ctx.hintLevel ?? 1}. Fill stuckHelp at that level, keep the SAME current question, do not advance, feedback=null.`,
+      `task: The learner is STUCK and asked for help at hintLevel=${ctx.hintLevel ?? 1}. Fill stuckHelp at that level, keep the SAME current question, do not advance, feedback=null, assessment=null.`,
     );
   } else {
     lines.push(
       `task: React to the learner's message, give selective feedback about it, then ask ONE new related question with scaffolding appropriate to their level.`,
+    );
+  }
+
+  if (ctx.assessmentDue) {
+    lines.push(
+      `assessment_due: TRUE — it is time for a periodic level check. Honestly evaluate the learner's whole performance and fill 'assessment' this turn. Still continue the conversation normally and do not mention the assessment out loud.`,
     );
   }
 

@@ -2,10 +2,22 @@ import { NextResponse } from "next/server";
 import { createSession, getSession } from "@/lib/services/conversation";
 import { getCurrentUser } from "@/lib/auth/session";
 import type { UserRow } from "@/lib/db/schema";
+import { isTopicSlug } from "@/lib/topics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** Best-effort read of an optional topic slug from the request body. */
+async function readTopic(request: Request): Promise<string | undefined> {
+  try {
+    const body = await request.json();
+    const topic = (body as { topic?: unknown })?.topic;
+    return isTopicSlug(topic) ? topic : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Resolve an authenticated + approved user, or an error response. */
 async function requireApiUser(): Promise<
@@ -22,17 +34,20 @@ async function requireApiUser(): Promise<
 }
 
 /** POST /api/session -> create a new conversation and get the opening turn. */
-export async function POST() {
+export async function POST(request: Request) {
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
 
+  const topic = await readTopic(request);
+
   try {
-    const { session, message } = await createSession(auth.user.id);
+    const { session, message } = await createSession(auth.user.id, { topic });
     return NextResponse.json({
       session: {
         id: session.id,
         title: session.title,
         currentLevel: session.currentLevel,
+        topic: session.topic,
       },
       message,
     });
@@ -66,6 +81,7 @@ export async function GET(request: Request) {
         id: result.session.id,
         title: result.session.title,
         currentLevel: result.session.currentLevel,
+        topic: result.session.topic,
       },
       messages: result.messages,
     });
