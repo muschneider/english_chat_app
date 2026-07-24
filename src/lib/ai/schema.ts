@@ -154,7 +154,7 @@ export const teacherTurnSchema = z.object({
   conversation: z
     .string()
     .describe(
-      "PURE friendly chat IN ENGLISH, like texting a warm, funny friend: react to what the learner said, then ask ONE contextual follow-up question. Match their tone and length, show empathy, use light humor when it fits. NEVER put corrections, tips, vocabulary, sentence frames, model answers or any teaching here — all of that goes in the feedback/toolkit fields. Never generic, never end the conversation.",
+      "PURE friendly chat IN ENGLISH, like texting a warm, funny friend who has their OWN personality: react to what the learner said, add your own take / reaction / mini-story when it fits, and usually (not always) ask ONE fresh follow-up question. Match their tone and length, show empathy, use light humor when it fits. Do NOT interrogate and do NOT keep circling one narrow detail — bring new energy and let the subject wander naturally. NEVER put corrections, tips, vocabulary, sentence frames, model answers or any teaching here — all of that goes in the feedback/toolkit fields. Never generic, never end the conversation.",
     ),
   topic: z.string().describe("Short label of the current topic, e.g. 'Travel'."),
   level: cefrLevelSchema.describe(
