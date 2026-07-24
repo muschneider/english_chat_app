@@ -12,6 +12,8 @@ const bodySchema = z.object({
   intent: z.enum(["reply", "hint"]),
   message: z.string().max(4000).optional(),
   hintLevel: z.number().int().min(1).max(3).optional(),
+  /** The learner's LOCAL time of day, computed on the client. */
+  daypart: z.enum(["morning", "afternoon", "evening", "night"]).optional(),
 });
 
 /** POST /api/chat -> advance the conversation (reply or request a hint). */

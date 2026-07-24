@@ -18,6 +18,7 @@ import { generateTeacherTurn } from "@/lib/ai/teacher";
 import type { MemoryUpdate, TeacherTurn } from "@/lib/ai/schema";
 import type { LearnerProfile, TurnContext } from "@/lib/ai/prompt";
 import { shiftLevel, nextErrorScore } from "@/lib/levels";
+import type { Daypart } from "@/lib/time";
 import {
   isTopicSlug,
   randomTopicSlug,
@@ -108,6 +109,8 @@ async function upsertUserMemories(userId: string, updates: MemoryUpdate[]) {
 export interface CreateSessionOptions {
   /** A topic slug the learner picked; when absent/invalid a random one is used. */
   topic?: string;
+  /** The learner's LOCAL part of the day, so the opening greeting fits the clock. */
+  daypart?: Daypart;
 }
 
 /** Create a brand new session (owned by `userId`) and generate the opening turn. */
@@ -139,6 +142,7 @@ export async function createSession(
     currentLevel: startingLevel,
     recentErrorScore: session.recentErrorScore,
     topic: topicEnLabel(topicSlug),
+    daypart: options.daypart,
   };
 
   const turn = await generateTeacherTurn({
@@ -231,6 +235,8 @@ export interface AdvanceArgs {
   intent: "reply" | "hint";
   message?: string;
   hintLevel?: number;
+  /** The learner's LOCAL part of the day, for a natural time-aware greeting. */
+  daypart?: Daypart;
 }
 
 export interface AdvanceResult {
@@ -297,6 +303,7 @@ export async function advanceConversation(
         recentErrorScore: session.recentErrorScore,
         hintLevel,
         topic: topicLabel,
+        daypart: args.daypart,
         errorTally,
       },
       profile,
@@ -339,6 +346,7 @@ export async function advanceConversation(
       currentLevel: session.currentLevel,
       recentErrorScore: session.recentErrorScore,
       topic: topicLabel,
+      daypart: args.daypart,
       assessmentDue,
       errorTally,
       patternToDrill: patternToDrill

@@ -6,6 +6,7 @@ import type { CEFRLevel, TeacherTurn } from "@/lib/ai/schema";
 import type { ClientMessage } from "@/lib/services/conversation";
 import type { AppUser } from "@/lib/auth/types";
 import { logoutAction } from "@/lib/auth/actions";
+import { currentDaypart } from "@/lib/time";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
@@ -105,7 +106,7 @@ export function ChatApp({ user }: { user: AppUser }) {
     const res = await fetch("/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(topic ? { topic } : {}),
+      body: JSON.stringify({ daypart: currentDaypart(), ...(topic ? { topic } : {}) }),
     });
     if (!res.ok) throw new Error("failed to create session");
     const data = await res.json();
@@ -148,7 +149,12 @@ export function ChatApp({ user }: { user: AppUser }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, intent: "reply", message: textValue }),
+        body: JSON.stringify({
+          sessionId,
+          intent: "reply",
+          message: textValue,
+          daypart: currentDaypart(),
+        }),
       });
       if (!res.ok) throw new Error("chat failed");
       const data = await res.json();
@@ -173,7 +179,12 @@ export function ChatApp({ user }: { user: AppUser }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, intent: "hint", hintLevel: nextHint }),
+        body: JSON.stringify({
+          sessionId,
+          intent: "hint",
+          hintLevel: nextHint,
+          daypart: currentDaypart(),
+        }),
       });
       if (!res.ok) throw new Error("hint failed");
       const data = await res.json();

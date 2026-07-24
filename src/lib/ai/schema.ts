@@ -137,10 +137,14 @@ export const detectedPatternSchema = z
     errorType: z.string(),
     message: z
       .string()
-      .describe("Friendly 'I noticed a pattern' explanation of the recurring mistake."),
+      .describe(
+        "Friendly 'I noticed a pattern' explanation of the recurring mistake. Shown in its OWN panel — never inside 'conversation'.",
+      ),
     drills: z
       .array(z.string())
-      .describe("2-3 quick practice prompts targeting exactly this point."),
+      .describe(
+        "2-3 quick practice prompts targeting exactly this point. Shown in the pattern panel, not the chat.",
+      ),
   })
   .nullable();
 export type DetectedPattern = z.infer<typeof detectedPatternSchema>;
@@ -150,14 +154,14 @@ export const teacherTurnSchema = z.object({
   conversation: z
     .string()
     .describe(
-      "The teacher speaking naturally IN ENGLISH: react to the learner, then ask ONE contextual follow-up question. Never generic. Never end the conversation.",
+      "PURE friendly chat IN ENGLISH, like texting a warm, funny friend: react to what the learner said, then ask ONE contextual follow-up question. Match their tone and length, show empathy, use light humor when it fits. NEVER put corrections, tips, vocabulary, sentence frames, model answers or any teaching here — all of that goes in the feedback/toolkit fields. Never generic, never end the conversation.",
     ),
   topic: z.string().describe("Short label of the current topic, e.g. 'Travel'."),
   level: cefrLevelSchema.describe(
     "The adaptive level you are teaching at THIS turn, based on the learner's demonstrated ability.",
   ),
   toolkit: toolkitSchema.describe(
-    "The survival kit. Fill richly for A1-A2, lighter for B1, and mostly empty arrays for B2+.",
+    "The survival kit shown in the HELPFUL TOOLKIT panel (never in the chat). Fill richly for A1-A2, lighter for B1, and mostly empty arrays for B2+.",
   ),
   miniStructure: z
     .string()
@@ -172,7 +176,7 @@ export const teacherTurnSchema = z.object({
   feedback: feedbackSchema
     .nullable()
     .describe(
-      "Correction of the learner's PREVIOUS message. Null on the very first turn (no message yet) and when the turn is a stuck-help response.",
+      "Correction of the learner's PREVIOUS message, shown in the FEEDBACK panel (never inside 'conversation'). Null on the very first turn (no message yet) and when the turn is a stuck-help response.",
     ),
   detectedPattern: detectedPatternSchema.describe(
     "Set only when the same error type has now happened 3 times. Otherwise null.",

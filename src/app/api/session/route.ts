@@ -7,19 +7,31 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import type { UserRow } from "@/lib/db/schema";
 import { isTopicSlug } from "@/lib/topics";
+import { isDaypart, type Daypart } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Best-effort read of an optional topic slug from the request body. */
-async function readTopic(request: Request): Promise<string | undefined> {
+/**
+ * Best-effort read of the optional new-session options from the request body:
+ * a chosen topic slug and the learner's local part of the day. The body can
+ * only be consumed once, so both are parsed together.
+ */
+async function readSessionOptions(
+  request: Request,
+): Promise<{ topic?: string; daypart?: Daypart }> {
   try {
-    const body = await request.json();
-    const topic = (body as { topic?: unknown })?.topic;
-    return isTopicSlug(topic) ? topic : undefined;
+    const body = (await request.json()) as {
+      topic?: unknown;
+      daypart?: unknown;
+    };
+    return {
+      topic: isTopicSlug(body?.topic) ? body.topic : undefined,
+      daypart: isDaypart(body?.daypart) ? body.daypart : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -42,10 +54,13 @@ export async function POST(request: Request) {
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
 
-  const topic = await readTopic(request);
+  const { topic, daypart } = await readSessionOptions(request);
 
   try {
-    const { session, message } = await createSession(auth.user.id, { topic });
+    const { session, message } = await createSession(auth.user.id, {
+      topic,
+      daypart,
+    });
     return NextResponse.json({
       session: {
         id: session.id,

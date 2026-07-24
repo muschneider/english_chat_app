@@ -50,6 +50,7 @@ export function TopicPicker({ onStart, disabled }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
+        suppressHydrationWarning
         title="Nova conversa"
         className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
       >

@@ -12,26 +12,18 @@ interface Props {
   nativeLanguage: string;
 }
 
-function ChipRow({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: string[];
-  tone: string;
-}) {
+function ChipRow({ title, items }: { title: string; items: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
         {title}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item, i) => (
           <span
             key={`${item}-${i}`}
-            className={`rounded-lg px-2 py-1 text-sm font-medium ring-1 ${tone}`}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           >
             {item}
           </span>
@@ -60,29 +52,24 @@ export function SurvivalKit({
   if (!hasAnything) return null;
 
   return (
-    <div className="relative mt-3 overflow-hidden rounded-2xl border-2 border-brand-300 bg-brand-50 shadow-md ring-1 ring-brand-200/70 dark:border-brand-600/70 dark:bg-slate-900 dark:shadow-none dark:ring-brand-800/60">
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-brand-500 via-brand-600 to-brand-700 dark:from-brand-400 dark:via-brand-500 dark:to-brand-600"
-      />
-
+    <div className="mt-3 overflow-hidden rounded-2xl border border-brand-200/80 bg-brand-50/40 dark:border-brand-800/50 dark:bg-slate-900/60">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 pl-5 text-left transition hover:bg-brand-100/80 dark:hover:bg-slate-800/80"
+        className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-brand-100/50 dark:hover:bg-slate-800/50"
       >
-        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-800 dark:text-white">
+        <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
           <span
             aria-hidden
-            className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-br from-brand-500 to-brand-700 text-xs text-white shadow-sm"
+            className="grid h-5 w-5 place-items-center rounded-full bg-brand-500/15 text-[11px] dark:bg-brand-400/15"
           >
             🧰
           </span>
           Helpful Toolkit
         </span>
         <svg
-          className={`h-4 w-4 text-brand-700 transition-transform dark:text-brand-300 ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-brand-500 transition-transform dark:text-brand-400 ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20"
           fill="currentColor"
           aria-hidden
@@ -96,30 +83,15 @@ export function SurvivalKit({
       </button>
 
       {open && (
-        <div className="space-y-3.5 border-t border-brand-200 bg-white/70 px-4 pb-4 pt-3 dark:border-brand-800/70 dark:bg-slate-950/70">
-          <ChipRow
-            title="Useful verbs"
-            items={toolkit.usefulVerbs}
-            tone="bg-white text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600"
-          />
-          <ChipRow
-            title="Useful expressions"
-            items={toolkit.usefulExpressions}
-            tone="bg-white text-brand-700 ring-brand-300 dark:bg-slate-800 dark:text-indigo-300 dark:ring-indigo-700/70"
-          />
-          <ChipRow
-            title="Useful connectors"
-            items={toolkit.usefulConnectors}
-            tone="bg-white text-emerald-700 ring-emerald-300 dark:bg-slate-800 dark:text-emerald-300 dark:ring-emerald-700/70"
-          />
+        <div className="space-y-3.5 border-t border-brand-200/60 px-4 pb-4 pt-3.5 dark:border-brand-800/50">
+          <ChipRow title="Useful verbs" items={toolkit.usefulVerbs} />
+          <ChipRow title="Useful expressions" items={toolkit.usefulExpressions} />
+          <ChipRow title="Useful connectors" items={toolkit.usefulConnectors} />
 
           {hasTip && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm dark:border-amber-600/70 dark:bg-amber-950/60 dark:text-amber-100">
+            <div className="rounded-xl border border-amber-200/70 bg-amber-50/70 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-100">
               <p>
-                <span className="font-bold">💡 Grammar tip: </span>
-                {/* Translate only the EXPLANATORY tip. The vocabulary below */}
-                {/* (verbs, expressions, connectors) stays in English by */}
-                {/* design — it's what the learner is here to learn. */}
+                <span className="font-semibold">💡 Grammar tip: </span>
                 {toolkit.grammarTip}
               </p>
               <TranslatableText
@@ -132,20 +104,24 @@ export function SurvivalKit({
           )}
 
           {miniStructure && (
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 ✨ Mini structure
               </p>
-              <p className="whitespace-pre-line font-medium">{miniStructure}</p>
+              <p className="whitespace-pre-line rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                {miniStructure}
+              </p>
             </div>
           )}
 
           {modelAnswer && (
-            <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 shadow-sm dark:border-emerald-600/70 dark:bg-emerald-950/60 dark:text-emerald-100">
-              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Suggested answer
               </p>
-              <p className="italic">&ldquo;{modelAnswer}&rdquo;</p>
+              <p className="rounded-lg bg-emerald-50/70 px-3 py-2 text-sm italic text-emerald-900 ring-1 ring-emerald-200/70 dark:bg-emerald-950/30 dark:text-emerald-100 dark:ring-emerald-800/50">
+                &ldquo;{modelAnswer}&rdquo;
+              </p>
             </div>
           )}
         </div>
