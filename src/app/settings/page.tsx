@@ -4,9 +4,14 @@ import { db } from "@/lib/db";
 import { userMemories } from "@/lib/db/schema";
 import type { MemoryCategory, UserMemoryRow } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/session";
-import { forgetMemoryAction, logoutAction } from "@/lib/auth/actions";
+import {
+  forgetMemoryAction,
+  logoutAction,
+  logoutAllOtherSessionsAction,
+} from "@/lib/auth/actions";
 import { LevelSettingsForm } from "@/components/LevelSettingsForm";
 import { LanguageSettingsForm } from "@/components/LanguageSettingsForm";
+import { ChangePasswordForm } from "@/components/auth/ChangePasswordForm";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +77,26 @@ export default async function SettingsPage() {
           Língua nativa
         </h2>
         <LanguageSettingsForm initialLanguage={user.nativeLanguage} />
+      </section>
+
+      {/* Security */}
+      <section className="mb-8 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Senha
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Trocar sua senha desconecta automaticamente as outras sessões que
+          estiverem abertas.
+        </p>
+        <ChangePasswordForm />
+        <form action={logoutAllOtherSessionsAction} className="mt-4">
+          <button
+            type="submit"
+            className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+          >
+            Sair de todos os outros dispositivos
+          </button>
+        </form>
       </section>
 
       {/* Memory */}

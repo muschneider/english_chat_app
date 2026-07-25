@@ -9,6 +9,7 @@ node = "26"
 [env]
 _.file = ".env.local"
 
+
 [tasks.install]
 description = "Install npm dependencies"
 run = "npm install"

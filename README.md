@@ -75,6 +75,12 @@ mise run dev          # http://localhost:3000
 OPENCODE_API_KEY="sua-chave-opencode-zen"
 OPENCODE_MODEL="claude-sonnet-5"   # opcional
 DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
+
+# Para o fluxo "esqueci minha senha" (opcional em dev, obrigatório em prod).
+# Pegue a chave em https://resend.com/api-keys
+# RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxxxxxxxx"
+# RESEND_FROM="English Conversation Tutor <noreply@seudominio.com>"
+# PUBLIC_BASE_URL="https://seudominio.com"   # usado para montar o link do e-mail
 ```
 
 ---
@@ -98,6 +104,26 @@ O app é protegido por login. O fluxo:
 Segurança: senhas com **scrypt** (nativo do Node), sessão via cookie
 **HttpOnly** com apenas o hash do token guardado no banco (`auth_sessions`), e
 cada conversa é escopada ao seu dono.
+
+### Esqueci minha senha / trocar senha
+
+- **`/forgot`** → o usuário informa o e-mail. O sistema gera um token
+  single-use (TTL 1h) e envia o link via **Resend** (ou devolve mensagem
+  genérica se o envio falhar). A resposta é sempre a mesma para não vazar
+  quais e-mails existem.
+- **`/reset?token=…`** → o usuário define a nova senha. O token é consumido
+  (não pode ser reusado), todas as sessões do usuário são invalidadas e uma
+  nova é criada automaticamente.
+- **`/settings`** → cartão "Senha" para trocar a senha **logado** (pede a
+  senha atual e desconecta as outras sessões). Botão "Sair de todos os outros
+  dispositivos".
+
+Tokens armazenados em `password_reset_tokens` (apenas o **SHA-256** do token
+bruto, igual ao esquema de `auth_sessions`). Rate limit embutido:
+`RESET_RATE_LIMIT = 3` pedidos por usuário a cada 15 min.
+
+Sem `RESEND_API_KEY`, o fluxo `/forgot` devolve erro genérico em vez de fingir
+ter enviado — coloque a chave em `.env.local` para testar localmente.
 
 ### Criar o admin (seed)
 
@@ -139,6 +165,8 @@ O `mise.toml` carrega automaticamente o `.env.local` em todas as tasks.
    - `OPENCODE_API_KEY`
    - `DATABASE_URL` (a connection string do Neon)
    - `OPENCODE_MODEL` (opcional)
+   - `RESEND_API_KEY` e `RESEND_FROM` (para o fluxo "esqueci minha senha")
+   - `PUBLIC_BASE_URL` (ex.: `https://seudominio.com`, usado no link do e-mail)
 4. Aplique o schema no banco de produção (uma vez):
    `mise run db:migrate` (localmente, apontando `DATABASE_URL` para o Neon).
 5. Deploy.
@@ -166,12 +194,16 @@ src/
     api/chat/route.ts       # avança a conversa (resposta ou dica)
     api/session/route.ts    # cria (com tópico opcional) / carrega sessão
     api/translate/route.ts  # traduz um trecho curto para a língua do aluno
-    settings/page.tsx       # nível de inglês + língua nativa + memória do tutor
+    forgot/page.tsx         # pedir link de redefinição de senha
+    reset/page.tsx          # definir nova senha a partir do link do e-mail
+    settings/page.tsx       # nível + língua + senha + memória do tutor
     page.tsx, layout.tsx, globals.css
   components/                # ChatApp, MessageBubble, SurvivalKit, FeedbackCard,
                              # StuckHelp, PatternAlert, AssessmentCard,
                              # TopicPicker, ChatInput, TranslatableText,
-                             # LanguageSettingsForm, LevelSettingsForm...
+                             # LanguageSettingsForm, LevelSettingsForm,
+                             # auth/{AuthShell,LoginForm,RegisterForm,
+                             # ForgotForm,ResetForm,ChangePasswordForm}...
   lib/
     ai/
       provider.ts            # opencode Zen (Claude Sonnet 5)
@@ -179,10 +211,20 @@ src/
       prompt.ts              # persona + adaptação + perfil/memória + tópico
       teacher.ts             # chamada generateObject (com perfil + memórias)
       translatePrompt.ts     # prompt focado do tradutor (lib/ai/translatePrompt.ts)
+    auth/
+      actions.ts             # register, login, logout, aprovar/rejeitar,
+                             # update level/language, forgetMemory,
+                             # forgot/reset/changePassword, logoutAllOther
+      password.ts            # hash/verify (scrypt)
+      reset.ts               # tokens de reset (criar, validar, consumir)
+      session.ts             # sessão por cookie HttpOnly (auth_sessions)
+      validation.ts          # Zod (register, login, password, reset, change)
+    email/resend.ts          # wrapper do Resend (envio do e-mail de reset)
     languages.ts             # lista de línguas nativas suportadas (código + label)
     db/
-      schema.ts              # users, sessions, messages, error_patterns,
-                             # user_memories
+      schema.ts              # users, auth_sessions, sessions, messages,
+                             # error_patterns, user_memories,
+                             # password_reset_tokens
       index.ts               # cliente Drizzle + Neon (lazy)
     services/conversation.ts # orquestra IA + banco + nível + memória + avaliação
     topics.ts                # 19 tópicos (slug/pt/en) + sorteio

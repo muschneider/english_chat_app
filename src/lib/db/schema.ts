@@ -201,9 +201,38 @@ export const errorPatterns = pgTable(
   (table) => [index("error_patterns_session_idx").on(table.sessionId, table.errorType)],
 );
 
+/**
+ * One-time tokens used by the "forgot password" flow. The user receives an
+ * email with a link containing the raw token; only its SHA-256 hash lives here
+ * (same pattern as `authSessions.tokenHash`). A token is valid for 1 hour and
+ * becomes invalid the moment it is consumed (`usedAt` is set).
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    // Best-effort audit: where the request came from. Optional.
+    requestIp: varchar("request_ip", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("password_reset_tokens_user_idx").on(table.userId),
+    index("password_reset_tokens_expires_idx").on(table.expiresAt),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type AuthSessionRow = typeof authSessions.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type ErrorPatternRow = typeof errorPatterns.$inferSelect;
 export type UserMemoryRow = typeof userMemories.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;

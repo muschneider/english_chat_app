@@ -1,5 +1,5 @@
 /** Shape returned by the auth server actions to drive `useActionState`. */
-export type AuthFormState = { error: string } | null;
+export type AuthFormState = { error?: string; success?: string } | null;
 
 /**
  * Minimal, serializable user passed from Server Components to the client
