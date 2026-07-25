@@ -56,7 +56,13 @@ export async function generateTeacherTurn({
     system,
     messages,
     // Note: claude-sonnet-5 ignores `temperature`, so we omit it.
-    maxOutputTokens: 1800,
+    // The structured turn can be large: on a single turn the model may emit
+    // conversation + full A1 toolkit + feedback + a periodic assessment + a
+    // detectedPattern. At 1800 the JSON was getting truncated (finishReason
+    // 'length' → unparseable object). Give it comfortable headroom; the model
+    // still stops as soon as the object is complete, so normal turns stay cheap
+    // and are actually FASTER (they finish instead of running to the cap).
+    maxOutputTokens: 4096,
     maxRetries: 2,
   });
 
