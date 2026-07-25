@@ -76,11 +76,13 @@ OPENCODE_API_KEY="sua-chave-opencode-zen"
 OPENCODE_MODEL="claude-sonnet-5"   # opcional
 DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
 
-# Para o fluxo "esqueci minha senha" (opcional em dev, obrigatório em prod).
-# Pegue a chave em https://resend.com/api-keys
-# RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxxxxxxxx"
-# RESEND_FROM="English Conversation Tutor <noreply@seudominio.com>"
-# PUBLIC_BASE_URL="https://seudominio.com"   # usado para montar o link do e-mail
+# Para o fluxo "esqueci minha senha" (SMTP). Default é Gmail — veja abaixo.
+# SMTP_HOST="smtp.gmail.com"          # default
+# SMTP_PORT="587"                     # 587 (STARTTLS) ou 465 (SSL)
+# SMTP_USER="voce@gmail.com"
+# SMTP_PASSWORD="xxxx xxxx xxxx xxxx"  # App Password de 16 chars
+# SMTP_FROM="English Conversation Tutor <voce@gmail.com>"  # opcional
+# PUBLIC_BASE_URL="https://seudominio.com"   # usado no link do e-mail
 ```
 
 ---
@@ -108,9 +110,9 @@ cada conversa é escopada ao seu dono.
 ### Esqueci minha senha / trocar senha
 
 - **`/forgot`** → o usuário informa o e-mail. O sistema gera um token
-  single-use (TTL 1h) e envia o link via **Resend** (ou devolve mensagem
-  genérica se o envio falhar). A resposta é sempre a mesma para não vazar
-  quais e-mails existem.
+  single-use (TTL 1h) e envia o link via **SMTP** (Gmail por padrão, ou
+  qualquer outro provedor trocando as env vars). A resposta é sempre a mesma
+  para não vazar quais e-mails existem.
 - **`/reset?token=…`** → o usuário define a nova senha. O token é consumido
   (não pode ser reusado), todas as sessões do usuário são invalidadas e uma
   nova é criada automaticamente.
@@ -122,8 +124,31 @@ Tokens armazenados em `password_reset_tokens` (apenas o **SHA-256** do token
 bruto, igual ao esquema de `auth_sessions`). Rate limit embutido:
 `RESET_RATE_LIMIT = 3` pedidos por usuário a cada 15 min.
 
-Sem `RESEND_API_KEY`, o fluxo `/forgot` devolve erro genérico em vez de fingir
-ter enviado — coloque a chave em `.env.local` para testar localmente.
+Sem `SMTP_USER` + `SMTP_PASSWORD`, o fluxo `/forgot` devolve a mesma mensagem
+genérica e loga o erro no servidor — preencha as credenciais em
+`.env.local` para testar.
+
+#### Configurar Gmail (recomendado para quem não tem domínio)
+
+1. **Ativar verificação em duas etapas** na sua conta Google
+   (https://myaccount.google.com/security).
+2. **Criar um App Password**: https://myaccount.google.com/apppasswords
+   - Aplicativo: "Outro (nome personalizado)" → `English Chat App`
+   - O Google mostra uma senha de 16 caracteres (com espaços).
+3. Colar no `.env.local`:
+   ```env
+   SMTP_HOST="smtp.gmail.com"
+   SMTP_PORT="587"
+   SMTP_USER="seu.email@gmail.com"
+   SMTP_PASSWORD="abcd efgh ijkl mnop"
+   PUBLIC_BASE_URL="http://localhost:3000"   # em prod: a URL da Vercel
+   ```
+4. (Opcional) `SMTP_FROM` se quiser outro nome visível; precisa coincidir
+   com o `SMTP_USER` ou estar configurado em "Enviar e-mail como" no Gmail.
+
+Limite do Gmail: **500 envios/dia** por conta. Suficiente para um app
+pequeno. Se crescer, troque `SMTP_HOST` para Outlook, Mailgun, Brevo, etc. —
+o código é o mesmo (wrapper SMTP genérico via Nodemailer).
 
 ### Criar o admin (seed)
 
@@ -165,8 +190,10 @@ O `mise.toml` carrega automaticamente o `.env.local` em todas as tasks.
    - `OPENCODE_API_KEY`
    - `DATABASE_URL` (a connection string do Neon)
    - `OPENCODE_MODEL` (opcional)
-   - `RESEND_API_KEY` e `RESEND_FROM` (para o fluxo "esqueci minha senha")
-   - `PUBLIC_BASE_URL` (ex.: `https://seudominio.com`, usado no link do e-mail)
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (para o fluxo
+     "esqueci minha senha" — defaults do Gmail; veja acima)
+   - `SMTP_FROM` (opcional)
+   - `PUBLIC_BASE_URL` (ex.: `https://seu-app.vercel.app`, usado no link do e-mail)
 4. Aplique o schema no banco de produção (uma vez):
    `mise run db:migrate` (localmente, apontando `DATABASE_URL` para o Neon).
 5. Deploy.
@@ -219,7 +246,7 @@ src/
       reset.ts               # tokens de reset (criar, validar, consumir)
       session.ts             # sessão por cookie HttpOnly (auth_sessions)
       validation.ts          # Zod (register, login, password, reset, change)
-    email/resend.ts          # wrapper do Resend (envio do e-mail de reset)
+    email/smtp.ts            # wrapper Nodemailer/SMTP (envio do e-mail de reset)
     languages.ts             # lista de línguas nativas suportadas (código + label)
     db/
       schema.ts              # users, auth_sessions, sessions, messages,

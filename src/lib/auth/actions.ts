@@ -33,7 +33,7 @@ import {
   findValidPasswordResetToken,
   RESET_RATE_LIMIT,
 } from "./reset";
-import { sendPasswordResetEmail } from "@/lib/email/resend";
+import { sendPasswordResetEmail } from "@/lib/email/smtp";
 import type { AuthFormState } from "./types";
 
 const SESSION_COOKIE = "session";

@@ -1,35 +1,53 @@
-import { Resend } from "resend";
+import nodemailer, { type SendMailOptions, type Transporter } from "nodemailer";
 
 const APP_NAME = "English Conversation Tutor";
 
-function getApiKey(): string {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+function getSmtpConfig() {
+  const host = process.env.SMTP_HOST ?? "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT ?? 587);
+  const user = process.env.SMTP_USER;
+  const password = process.env.SMTP_PASSWORD;
+  if (!user || !password) {
     throw new Error(
-      "RESEND_API_KEY is not set. Add it to .env.local (get one at https://resend.com/api-keys) to enable password-reset emails.",
+      "SMTP_USER and SMTP_PASSWORD must be set to send password-reset emails. " +
+        "See README for Gmail App Password setup.",
     );
   }
-  return key;
+  return { host, port, user, password };
 }
 
 function getFromAddress(): string {
-  return process.env.RESEND_FROM ?? `${APP_NAME} <onboarding@resend.dev>`;
+  // If SMTP_FROM is set, use it; otherwise fall back to "App Name <SMTP_USER>".
+  // Gmail's "Send mail as" lets you use a custom From without owning the SMTP
+  // relay; the safest default is to use the same address that authenticates.
+  if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
+  const { user } = getSmtpConfig();
+  return `${APP_NAME} <${user}>`;
 }
 
 function getBaseUrl(): string {
   return process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
 }
 
-let cached: Resend | null = null;
-function getClient(): Resend {
-  if (cached) return cached;
-  cached = new Resend(getApiKey());
-  return cached;
+/**
+ * Build a fresh transporter per send. In Vercel serverless, persistent SMTP
+ * connections are unreliable (the function may be suspended between calls),
+ * so we keep this stateless. The cost is one extra TCP+TLS handshake per
+ * email, which is negligible for a low-volume transactional flow.
+ */
+function buildTransport(): Transporter {
+  const { host, port, user, password } = getSmtpConfig();
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass: password },
+  });
 }
 
 /**
  * Send a password-reset email containing a single-use link valid for 1 hour.
- * Throws if `RESEND_API_KEY` is missing or the Resend API rejects the send.
+ * Throws if SMTP credentials are missing or the SMTP server rejects the send.
  * Callers should catch and surface a generic "we couldn't send the email"
  * message so the UI doesn't leak infrastructure details.
  */
@@ -38,16 +56,21 @@ export async function sendPasswordResetEmail(
   rawToken: string,
 ): Promise<void> {
   const resetUrl = `${getBaseUrl().replace(/\/$/, "")}/reset?token=${encodeURIComponent(rawToken)}`;
-  const client = getClient();
-  const { error } = await client.emails.send({
+
+  const mail: SendMailOptions = {
     from: getFromAddress(),
     to,
     subject: `Redefina sua senha — ${APP_NAME}`,
     text: textBody(resetUrl),
     html: htmlBody(resetUrl),
-  });
-  if (error) {
-    throw new Error(`Resend error: ${error.message}`);
+  };
+
+  const transport = buildTransport();
+  try {
+    await transport.sendMail(mail);
+  } finally {
+    // Close the SMTP connection promptly — serverless hygiene.
+    transport.close();
   }
 }
 
