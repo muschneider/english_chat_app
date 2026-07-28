@@ -8,6 +8,7 @@ import { FeedbackCard } from "./FeedbackCard";
 import { PatternAlert } from "./PatternAlert";
 import { AssessmentCard } from "./AssessmentCard";
 import { TranslatableText } from "./TranslatableText";
+import { TUTOR_PERSONA } from "@/lib/ai/persona";
 
 function SpeakButton({ text }: { text: string }) {
   const [speaking, setSpeaking] = useState(false);
@@ -92,8 +93,11 @@ export function MessageBubble({
       )}
 
       <div className="flex items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm">
-          T
+        <div
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm"
+          title={TUTOR_PERSONA.name}
+        >
+          {TUTOR_PERSONA.initial}
         </div>
         <div className="min-w-0 flex-1">
           <div className="inline-block max-w-full rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-slate-800 shadow-sm ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">

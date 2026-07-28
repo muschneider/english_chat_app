@@ -207,9 +207,12 @@ export async function updateEnglishLevelAction(
   }
 
   if (targetSessionId) {
+    // Clear the adaptive evidence too: an explicit choice by the learner is a
+    // fresh start. Leaving stale drift behind could immediately drag the level
+    // away from what they just picked.
     await db
       .update(sessions)
-      .set({ currentLevel: normalized, updatedAt: new Date() })
+      .set({ currentLevel: normalized, levelDrift: 0, updatedAt: new Date() })
       .where(and(eq(sessions.id, targetSessionId), eq(sessions.userId, user.id)));
   }
 

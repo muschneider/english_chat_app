@@ -6,7 +6,7 @@ import type { CEFRLevel, TeacherTurn } from "@/lib/ai/schema";
 import type { ClientMessage } from "@/lib/services/conversation";
 import type { AppUser } from "@/lib/auth/types";
 import { logoutAction } from "@/lib/auth/actions";
-import { currentDaypart } from "@/lib/time";
+import { currentDaypart, currentWeekday } from "@/lib/time";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
@@ -14,6 +14,7 @@ import { StuckHelp } from "./StuckHelp";
 import { LevelBadge } from "./LevelBadge";
 import { ThemeToggle } from "./ThemeToggle";
 import { TopicPicker } from "./TopicPicker";
+import { TUTOR_PERSONA } from "@/lib/ai/persona";
 
 const STORAGE_KEY = "english-tutor-session-id";
 
@@ -106,7 +107,11 @@ export function ChatApp({ user }: { user: AppUser }) {
     const res = await fetch("/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ daypart: currentDaypart(), ...(topic ? { topic } : {}) }),
+      body: JSON.stringify({
+        daypart: currentDaypart(),
+        weekday: currentWeekday(),
+        ...(topic ? { topic } : {}),
+      }),
     });
     if (!res.ok) throw new Error("failed to create session");
     const data = await res.json();
@@ -154,6 +159,7 @@ export function ChatApp({ user }: { user: AppUser }) {
           intent: "reply",
           message: textValue,
           daypart: currentDaypart(),
+          weekday: currentWeekday(),
         }),
       });
       if (!res.ok) throw new Error("chat failed");
@@ -184,6 +190,7 @@ export function ChatApp({ user }: { user: AppUser }) {
           intent: "hint",
           hintLevel: nextHint,
           daypart: currentDaypart(),
+          weekday: currentWeekday(),
         }),
       });
       if (!res.ok) throw new Error("hint failed");
@@ -209,10 +216,10 @@ export function ChatApp({ user }: { user: AppUser }) {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-bold leading-tight text-slate-800 dark:text-slate-100">
-              English Conversation Tutor
+              {TUTOR_PERSONA.name}
             </h1>
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-              Adaptive practice · speak with a little help
+              {TUTOR_PERSONA.tagline}
             </p>
           </div>
         </div>
@@ -281,7 +288,7 @@ export function ChatApp({ user }: { user: AppUser }) {
           {booting && (
             <div className="flex flex-col items-center gap-3 pt-16 text-center text-slate-400 dark:text-slate-500">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-900 dark:border-t-brand-400" />
-              <p className="text-sm">Warming up your tutor…</p>
+              <p className="text-sm">{TUTOR_PERSONA.name} is typing…</p>
             </div>
           )}
 

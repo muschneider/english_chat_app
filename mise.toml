@@ -10,3 +10,50 @@ node = "26"
 _.file = ".env.local"
 
 [tasks.install]
+description = "Install npm dependencies"
+run = "npm install"
+
+[tasks.setup]
+description = "First-time setup: install deps and push the DB schema to Neon"
+depends = ["install"]
+run = "npm run db:push"
+
+[tasks.dev]
+description = "Run the Next.js dev server (http://localhost:3000)"
+run = "npm run dev"
+
+[tasks.build]
+description = "Production build"
+run = "npm run build"
+
+[tasks.start]
+description = "Start the production server (after build)"
+run = "npm run start"
+
+[tasks.typecheck]
+description = "TypeScript type checking (no emit)"
+run = "npm run typecheck"
+
+[tasks."db:generate"]
+description = "Generate SQL migrations from the Drizzle schema"
+run = "npm run db:generate"
+
+[tasks."db:migrate"]
+description = "Apply generated migrations to Neon"
+run = "npm run db:migrate"
+
+[tasks."db:push"]
+description = "Push the Drizzle schema straight to Neon (dev-friendly)"
+run = "npm run db:push"
+
+[tasks."db:apply"]
+description = "Apply the latest migration file non-interactively"
+run = "npm run db:apply"
+
+[tasks."db:seed"]
+description = "Create/ensure the admin (set ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD)"
+run = "npm run db:seed"
+
+[tasks."db:reset-conversations"]
+description = "Wipe all sessions/messages/error_patterns (requires CONFIRM=YES)"
+run = "node --env-file=.env.local scripts/reset-conversations.ts"

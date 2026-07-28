@@ -1,14 +1,69 @@
 # English Conversation Tutor
 
-Um app web de **conversação em inglês** com um professor de IA adaptativo. A cada
-turno o professor conversa naturalmente em inglês, entrega um **"kit de
-sobrevivência"** (verbos, expressões, conectores, dica de gramática), sugere uma
-**mini-estrutura** de resposta e, depois que você responde, dá **feedback
-seletivo** com correções e a versão que um nativo usaria. O nível de ajuda
-sobe e desce sozinho conforme o seu desempenho (A1 → C2).
+Um app web de **conversação em inglês** onde você conversa com o **Sam** — um
+amigo (de IA) que fala inglês e, sem você perceber, é um ótimo professor. O chat
+é só chat: nenhuma correção, nenhuma dica, nenhum "muito bem!". Toda a pedagogia
+acontece **fora da conversa**, em painéis laterais: um **"kit de sobrevivência"**
+(verbos, expressões, conectores, dica de gramática) antes de você responder e um
+**feedback seletivo** depois. O nível de ajuda sobe e desce sozinho conforme o
+seu desempenho (A1 → C2).
 
-Interface estilo mensageiro (WhatsApp/Telegram): professor à esquerda, você à
+Interface estilo mensageiro (WhatsApp/Telegram): Sam à esquerda, você à
 direita, input com **microfone** (fala → texto) e botão **ouvir** (texto → fala).
+
+---
+
+## O tutor como pessoa
+
+A maior causa de "cheiro de robô" em chats de IA é a **ausência de um eu
+estável**: sem identidade fixa, o modelo inventa uma pessoa diferente a cada
+turno e nunca consegue ter uma opinião, uma piada recorrente ou uma vida.
+
+Por isso o tutor é uma pessoa específica, definida em
+[`src/lib/ai/persona.ts`](src/lib/ai/persona.ts):
+
+> **Sam**, 34, de Portland, mora em Lisboa há 4 anos, designer de produto
+> remoto, tem um gato cinzento e barulhento chamado Pepper, corre mal e a
+> contragosto, é esnobe com café — e está **aprendendo português com muita
+> dificuldade**.
+
+Esse último detalhe é o coração do design: Sam também é um aprendiz sofrendo com
+uma língua. Isso torna a relação recíproca em vez de professor-sobre-aluno e diz
+silenciosamente ao aluno que errar é normal e sobrevivível.
+
+**Quer outro amigo?** Edite só o `TUTOR_PERSONA` — nome, inicial e bio. A voz
+inteira do app muda junto (avatar, header e prompt), sem tocar em mais nada.
+
+### O que faz o chat soar humano
+
+O prompt ([`src/lib/ai/prompt.ts`](src/lib/ai/prompt.ts)) apoia-se nas três
+alavancas que realmente mudam a voz de um modelo — adjetivos abstratos ("seja
+caloroso") não fazem quase nada:
+
+| Alavanca | O que é |
+| --- | --- |
+| **Identidade fixa** | A persona acima, injetada em todo turno. |
+| **Lista de tiques proibidos** | "That's fascinating!", "I'd love to hear more", "thank you for sharing", repetir a frase do aluno de volta, elogiar o aluno por escrever, usar o nome dele toda hora, começar duas mensagens igual, terminar toda mensagem com pergunta, markdown/listas/negrito. |
+| **Exemplos ruim → bom** | 5 pares concretos de resposta má vs. resposta humana, para as situações mais comuns (resposta de uma palavra, notícia ruim, abertura de sessão…). |
+
+Mais o que vem junto:
+
+- **Ritmo variável** — a maioria das mensagens tem 1–2 frases, algumas têm quatro
+  palavras, e o modelo é instruído a nunca repetir o formato do turno anterior.
+- **Reciprocidade** — Sam tem opiniões, reclama do calor, conta o que o gato
+  aprontou. Só ~3 em 4 mensagens terminam com pergunta; o resto deixa o assunto
+  respirar. Sem isso vira entrevista.
+- **Input compreensível** — a personalidade não muda com o nível, mas o
+  vocabulário sim: um "amigo totalmente natural" seria ilegível para um A1.
+- **Consciência de tempo** — o tutor recebe o dia da semana, a parte do dia e
+  **há quanto tempo você não escreve** (`describeGap` em `lib/time.ts`), então
+  ele diz "sumido!" depois de três dias em vez de continuar no meio da frase.
+- **Língua nativa** — Sam sabe de onde você é. Serve para naturalidade e, sem
+  aparecer, para antecipar erros típicos de falantes daquela língua.
+- **Casos difíceis** — o que fazer quando você escreve em português, responde só
+  "yes", está sendo grosso, conta uma tragédia, ou pergunta se ele é uma IA
+  (resposta: ele **admite honestamente**, em uma linha, sem drama, e segue a
+  conversa — ele nunca finge ser humano).
 
 ---
 
@@ -235,7 +290,8 @@ src/
     ai/
       provider.ts            # opencode Zen (Claude Sonnet 5)
       schema.ts              # schemas Zod (turno, memoryUpdates, assessment)
-      prompt.ts              # persona + adaptação + perfil/memória + tópico
+      persona.ts             # QUEM é o tutor (Sam) — o único knob da voz dele
+      prompt.ts              # system prompt + perfil/memória + estado do turno
       teacher.ts             # chamada generateObject (com perfil + memórias)
       translatePrompt.ts     # prompt focado do tradutor (lib/ai/translatePrompt.ts)
     auth/
@@ -255,7 +311,9 @@ src/
       index.ts               # cliente Drizzle + Neon (lazy)
     services/conversation.ts # orquestra IA + banco + nível + memória + avaliação
     topics.ts                # 19 tópicos (slug/pt/en) + sorteio
-    levels.ts, levelMeta.ts
+    time.ts                  # daypart, weekday e "há quanto tempo você sumiu"
+    levels.ts                # histerese do nível adaptativo (ver abaixo)
+    levelMeta.ts
 drizzle/                     # migrações SQL geradas
 ```
 
@@ -267,6 +325,15 @@ drizzle/                     # migrações SQL geradas
   `SurvivalKit.tsx`, campos `toolkit`/`miniStructure`/`modelAnswer` do schema.
 - **Níveis de ajuda adaptativos (A1–C2)** → `prompt.ts` (regras por nível) +
   `levels.ts` (drift de nível) + gating visual nos componentes.
+  O modelo sugere `up`/`down`/`same` **a cada turno**, mas isso é só um *voto*:
+  `applyLevelSignal()` acumula os votos em `sessions.level_drift` e só move o
+  nível quando a evidência é consistente. Duas assimetrias de propósito:
+  **promover exige 3 sinais, rebaixar exige 2** (ficar sem ajuda desanima, ficar
+  com ajuda demais só é redundante), e um sinal contrário **zera** o momentum,
+  então ruído `up/down/up/down` nunca chega ao limiar. Promoção também é
+  bloqueada enquanto o `recentErrorScore` mostra que o aluno está penando.
+  Antes disso o nível pulava A1 → B1 em dois turnos e o aluno perdia todo o
+  andaime no meio da conversa.
 - **Correção inteligente** → `FeedbackCard.tsx` + `feedback` do schema
   (correções seletivas, versão nativa, explicação curta).
 - **"Percebi um padrão" após 3 erros iguais** → tabela `error_patterns` +
@@ -277,7 +344,9 @@ drizzle/                     # migrações SQL geradas
   (escolhido no `/register`, editável em `/settings`). Novas conversas começam
   nesse nível; o motor adaptativo continua ajustando durante o papo.
 - **Língua nativa + tradução sob demanda** → coluna `users.native_language`
-  (escolhida no `/register`, editável em `/settings`). A resposta do tutor,
+  (escolhida no `/register`, editável em `/settings`). Também é injetada no
+  prompt: Sam sabe de onde você é e usa isso silenciosamente para antecipar
+  erros típicos de falantes daquela língua. A resposta do tutor,
   o **feedback** (explicações e mensagem de encorajamento) e a **dica de
   gramática** do Helpful Toolkit ganham um botão 🌐 que, ao ser clicado,
   traduz aquele trecho para a língua do aluno via `/api/translate`
@@ -295,7 +364,32 @@ drizzle/                     # migrações SQL geradas
   por conversa). O professor extrai fatos duráveis (`memoryUpdates`) e eles são
   reinjetados no prompt em toda sessão — então ele lembra quem é a esposa mesmo
   um mês depois. Gerenciável em `/settings`.
+- **Consciência de tempo** → o cliente manda o `daypart` e o `weekday` **locais**
+  (o servidor roda em UTC e erraria a saudação); o servidor calcula o silêncio
+  desde a sua última mensagem com `describeGap()`. Gaps abaixo de 10 minutos são
+  ignorados — pausa normal de conversa não merece comentário.
 
 > **Após atualizar:** aplique a migração nova no Neon uma vez —
 > `mise run db:apply` (ou `mise run db:push`). Ela só adiciona colunas/tabela
-> (aditiva, sem perda de dados).
+> (aditiva, sem perda de dados). A última é `0005` (`sessions.level_drift`).
+
+---
+
+## Melhorias ainda não feitas
+
+Coisas que valem a pena e que **não** foram implementadas:
+
+1. **Streaming da resposta.** Hoje cada turno usa `generateObject` e leva 10–13s
+   com a tela parada. `streamObject` deixaria o texto do chat aparecer enquanto
+   os painéis ainda estão sendo gerados — é de longe o maior ganho de UX
+   disponível, mas mexe no `ChatApp`, na rota e no serviço.
+2. **Prompt caching (Anthropic).** O system prompt é grande e ~90% estático em
+   todo turno. Cachear a parte fixa cortaria custo e latência. Não foi feito
+   porque depende de o gateway opencode Zen repassar `cache_control`, e isso
+   precisa ser verificado contra a API real antes.
+3. **`error_patterns` por usuário, não por sessão.** Hoje os padrões recorrentes
+   zeram quando você começa uma conversa nova, então um erro crônico pode nunca
+   chegar às 3 ocorrências. Precisa de migração + backfill.
+4. **Compactação de histórico.** `HISTORY_LIMIT = 24` corta a conversa em cru; em
+   papos longos o começo simplesmente desaparece. Um resumo rolante preservaria
+   o fio da meada.

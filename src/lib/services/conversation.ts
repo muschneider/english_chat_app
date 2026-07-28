@@ -17,8 +17,9 @@ import type {
 import { generateTeacherTurn } from "@/lib/ai/teacher";
 import type { MemoryUpdate, TeacherTurn } from "@/lib/ai/schema";
 import type { LearnerProfile, TurnContext } from "@/lib/ai/prompt";
-import { shiftLevel, nextErrorScore } from "@/lib/levels";
-import type { Daypart } from "@/lib/time";
+import { applyLevelSignal, nextErrorScore } from "@/lib/levels";
+import { getLanguage } from "@/lib/languages";
+import { describeGap, type Daypart, type Weekday } from "@/lib/time";
 import {
   isTopicSlug,
   randomTopicSlug,
@@ -72,7 +73,25 @@ async function loadUser(userId: string): Promise<UserRow | null> {
 }
 
 function toProfile(user: UserRow): LearnerProfile {
-  return { name: user.name, selfLevel: user.englishLevel };
+  return {
+    name: user.name,
+    selfLevel: user.englishLevel,
+    // The human label ("Português (Brasil)"), not the ISO code — the tutor is
+    // reading prose, and it also lets it anticipate L1 transfer errors.
+    nativeLanguage: getLanguage(user.nativeLanguage).label,
+  };
+}
+
+/**
+ * How long since the learner last spoke, in plain English ("3 days"), or null
+ * when it's just a normal back-and-forth pause. Drives the tutor's "hey, it's
+ * been a while" — the cheapest, most human signal there is.
+ */
+function gapSinceLastUserMessage(rows: MessageRow[]): string | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].role === "user") return describeGap(rows[i].createdAt);
+  }
+  return null;
 }
 
 /** All durable facts the tutor knows about this learner (most recent first). */
@@ -111,6 +130,8 @@ export interface CreateSessionOptions {
   topic?: string;
   /** The learner's LOCAL part of the day, so the opening greeting fits the clock. */
   daypart?: Daypart;
+  /** The learner's LOCAL weekday, so the tutor can notice it's Friday. */
+  weekday?: Weekday;
 }
 
 /** Create a brand new session (owned by `userId`) and generate the opening turn. */
@@ -143,6 +164,7 @@ export async function createSession(
     recentErrorScore: session.recentErrorScore,
     topic: topicEnLabel(topicSlug),
     daypart: options.daypart,
+    weekday: options.weekday,
   };
 
   const turn = await generateTeacherTurn({
@@ -237,6 +259,8 @@ export interface AdvanceArgs {
   hintLevel?: number;
   /** The learner's LOCAL part of the day, for a natural time-aware greeting. */
   daypart?: Daypart;
+  /** The learner's LOCAL weekday, so the tutor can notice it's Friday. */
+  weekday?: Weekday;
 }
 
 export interface AdvanceResult {
@@ -280,6 +304,9 @@ export async function advanceConversation(
   ).reverse();
 
   const history = toHistory(recentRows);
+  // Measured BEFORE this turn's message is appended, so it describes the
+  // silence the learner is breaking right now.
+  const gap = gapSinceLastUserMessage(recentRows);
 
   const tally = await loadErrorTally(sessionId);
   const errorTally = tally.map((t) => ({
@@ -304,6 +331,8 @@ export async function advanceConversation(
         hintLevel,
         topic: topicLabel,
         daypart: args.daypart,
+        weekday: args.weekday,
+        gap,
         errorTally,
       },
       profile,
@@ -347,6 +376,8 @@ export async function advanceConversation(
       recentErrorScore: session.recentErrorScore,
       topic: topicLabel,
       daypart: args.daypart,
+      weekday: args.weekday,
+      gap,
       assessmentDue,
       errorTally,
       patternToDrill: patternToDrill
@@ -392,9 +423,17 @@ export async function advanceConversation(
       );
   }
 
-  // Adaptive level + rolling error score.
-  const newLevel = shiftLevel(session.currentLevel, turn.suggestedLevelChange);
+  // Adaptive level + rolling error score. The model's per-turn suggestion is
+  // only a vote: `applyLevelSignal` requires several consistent votes (and a
+  // low error score to promote) before the level actually moves, so a single
+  // good sentence can't strip the learner of their scaffolding mid-chat.
   const newScore = nextErrorScore(session.recentErrorScore, corrections.length);
+  const { level: newLevel, drift: newDrift } = applyLevelSignal({
+    level: session.currentLevel,
+    drift: session.levelDrift,
+    direction: turn.suggestedLevelChange,
+    errorScore: newScore,
+  });
   // Advance the assessment cadence; reset it whenever an assessment was produced.
   const newTurnsSinceAssessment = turn.assessment
     ? 0
@@ -404,6 +443,7 @@ export async function advanceConversation(
     .update(sessions)
     .set({
       currentLevel: newLevel,
+      levelDrift: newDrift,
       recentErrorScore: newScore,
       turnsSinceAssessment: newTurnsSinceAssessment,
       updatedAt: new Date(),

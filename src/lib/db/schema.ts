@@ -108,6 +108,11 @@ export const sessions = pgTable(
     // Rolling count of "important" errors in recent turns, used to nudge the
     // adaptive level down when the learner struggles.
     recentErrorScore: integer("recent_error_score").default(0).notNull(),
+    // Signed evidence counter for the adaptive level (see lib/levels.ts).
+    // The model suggests up/down every turn; the level only actually moves once
+    // the suggestion has been consistent, so it never swings on one lucky
+    // sentence or one bad typo.
+    levelDrift: integer("level_drift").default(0).notNull(),
     // Learner replies since the last level assessment. When it reaches the
     // cadence threshold, the tutor runs a fresh CEFR assessment and resets it.
     turnsSinceAssessment: integer("turns_since_assessment").default(0).notNull(),

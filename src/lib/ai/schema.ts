@@ -85,7 +85,9 @@ export const feedbackSchema = z.object({
     ),
   encouragement: z
     .string()
-    .describe("One short, warm, genuine positive note about what went well."),
+    .describe(
+      "One short, specific note about what they got RIGHT in the language (a tense they nailed, a natural-sounding phrase). Concrete, not cheerleading — never 'Great job!' or 'You're doing great!'.",
+    ),
 });
 export type Feedback = z.infer<typeof feedbackSchema>;
 
@@ -154,7 +156,7 @@ export const teacherTurnSchema = z.object({
   conversation: z
     .string()
     .describe(
-      "PURE friendly chat IN ENGLISH, like texting a warm, funny friend who has their OWN personality: react to what the learner said, add your own take / reaction / mini-story when it fits, and usually (not always) ask ONE fresh follow-up question. Match their tone and length, show empathy, use light humor when it fits. Do NOT interrogate and do NOT keep circling one narrow detail — bring new energy and let the subject wander naturally. NEVER put corrections, tips, vocabulary, sentence frames, model answers or any teaching here — all of that goes in the feedback/toolkit fields. Never generic, never end the conversation.",
+      "Sam texting his friend, in English. Usually 1-2 sentences; sometimes four words; occasionally four or five sentences when there's a real story. React to what they actually said BEFORE anything else, add something of your own (an opinion, a small complaint, what your cat just did), and about three times out of four end with ONE genuine question. Plain text only — no markdown, no lists, no bold, at most a rare emoji. NEVER restate their message back, never praise them for writing, never say 'That's fascinating' / 'I'd love to hear more' / 'thank you for sharing'. NEVER put corrections, tips, vocabulary, sentence frames, model answers or any teaching here — all of that goes in the feedback/toolkit fields. Vary your opening and your length from the previous message. Never wrap up or end the conversation.",
     ),
   topic: z.string().describe("Short label of the current topic, e.g. 'Travel'."),
   level: cefrLevelSchema.describe(

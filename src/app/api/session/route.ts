@@ -7,7 +7,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import type { UserRow } from "@/lib/db/schema";
 import { isTopicSlug } from "@/lib/topics";
-import { isDaypart, type Daypart } from "@/lib/time";
+import { isDaypart, isWeekday, type Daypart, type Weekday } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,15 +20,17 @@ export const maxDuration = 60;
  */
 async function readSessionOptions(
   request: Request,
-): Promise<{ topic?: string; daypart?: Daypart }> {
+): Promise<{ topic?: string; daypart?: Daypart; weekday?: Weekday }> {
   try {
     const body = (await request.json()) as {
       topic?: unknown;
       daypart?: unknown;
+      weekday?: unknown;
     };
     return {
       topic: isTopicSlug(body?.topic) ? body.topic : undefined,
       daypart: isDaypart(body?.daypart) ? body.daypart : undefined,
+      weekday: isWeekday(body?.weekday) ? body.weekday : undefined,
     };
   } catch {
     return {};
@@ -54,12 +56,13 @@ export async function POST(request: Request) {
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
 
-  const { topic, daypart } = await readSessionOptions(request);
+  const { topic, daypart, weekday } = await readSessionOptions(request);
 
   try {
     const { session, message } = await createSession(auth.user.id, {
       topic,
       daypart,
+      weekday,
     });
     return NextResponse.json({
       session: {

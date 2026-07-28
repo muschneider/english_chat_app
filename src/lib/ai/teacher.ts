@@ -38,7 +38,11 @@ export async function generateTeacherTurn({
   ].join("\n\n");
 
   // The AI SDK requires at least one message. On the very first turn there is
-  // no learner message yet, so we seed a neutral kickoff instruction.
+  // no learner message yet, so we seed a kickoff instruction. It is phrased as
+  // a stage direction rather than a fake learner line ("let's begin our
+  // lesson") — a seed that sounds like a student asking for class pulls the
+  // model straight back into teacher mode, which is exactly what this app is
+  // trying to avoid.
   const messages: ModelMessage[] =
     history.length > 0
       ? history
@@ -46,7 +50,7 @@ export async function generateTeacherTurn({
           {
             role: "user",
             content:
-              "Let's begin our English conversation lesson. Please greet me briefly and ask your first contextual question.",
+              "[The chat window just opened. Nothing has been said yet. Send the first message.]",
           },
         ];
 

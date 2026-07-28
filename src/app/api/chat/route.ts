@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { advanceConversation } from "@/lib/services/conversation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { DAYPARTS, WEEKDAYS } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,9 @@ const bodySchema = z.object({
   message: z.string().max(4000).optional(),
   hintLevel: z.number().int().min(1).max(3).optional(),
   /** The learner's LOCAL time of day, computed on the client. */
-  daypart: z.enum(["morning", "afternoon", "evening", "night"]).optional(),
+  daypart: z.enum(DAYPARTS).optional(),
+  /** The learner's LOCAL weekday, computed on the client. */
+  weekday: z.enum(WEEKDAYS).optional(),
 });
 
 /** POST /api/chat -> advance the conversation (reply or request a hint). */

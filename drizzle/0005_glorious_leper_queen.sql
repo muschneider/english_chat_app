@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "level_drift" integer DEFAULT 0 NOT NULL;
