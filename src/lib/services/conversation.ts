@@ -14,8 +14,9 @@ import type {
   UserMemoryRow,
   UserRow,
 } from "@/lib/db/schema";
-import { generateTeacherTurn } from "@/lib/ai/teacher";
+import { generateTeacherTurn, streamTeacherTurn } from "@/lib/ai/teacher";
 import type { MemoryUpdate, TeacherTurn } from "@/lib/ai/schema";
+import type { DeepPartial } from "@/lib/ai/types";
 import type { LearnerProfile, TurnContext } from "@/lib/ai/prompt";
 import { applyLevelSignal, nextErrorScore } from "@/lib/levels";
 import { getLanguage } from "@/lib/languages";
@@ -271,13 +272,105 @@ export interface AdvanceResult {
 }
 
 /**
+ * Persist a completed teacher turn for a "reply" intent: writes the message,
+ * updates error-pattern tallies, durable memories, the drilled-pattern
+ * counter (if any), and the adaptive level / rolling error score / assessment
+ * cadence on the session row.
+ *
+ * Shared by the non-streaming (`advanceConversation`) and the streaming
+ * (`advanceConversationStream`) reply paths so both stay consistent.
+ */
+async function persistReplyTurn(args: {
+  sessionId: string;
+  session: SessionRow;
+  userId: string;
+  patternToDrill:
+    | {
+        errorType: string;
+        label: string;
+        count: number;
+      }
+    | null;
+  turn: TeacherTurn;
+}): Promise<{ teacherMessage: ClientMessage; level: SessionRow["currentLevel"] }> {
+  const { sessionId, session, userId, patternToDrill, turn } = args;
+
+  const [teacherRow] = await db
+    .insert(messages)
+    .values({
+      sessionId,
+      role: "teacher",
+      content: turn.conversation,
+      payload: turn,
+    })
+    .returning();
+
+  // Update recurring-error tallies from this turn's corrections.
+  const corrections = turn.feedback?.corrections ?? [];
+  await upsertErrorPatterns(sessionId, corrections);
+
+  // Remember any durable facts the learner revealed this turn.
+  await upsertUserMemories(userId, turn.memoryUpdates ?? []);
+
+  // If we drilled a pattern this turn, clear its counter.
+  if (turn.detectedPattern && patternToDrill) {
+    await db
+      .update(errorPatterns)
+      .set({ count: 0, drilledAt: new Date() })
+      .where(
+        and(
+          eq(errorPatterns.sessionId, sessionId),
+          eq(errorPatterns.errorType, patternToDrill.errorType),
+        ),
+      );
+  }
+
+  // Adaptive level + rolling error score. The model's per-turn suggestion is
+  // only a vote: `applyLevelSignal` requires several consistent votes (and a
+  // low error score to promote) before the level actually moves, so a single
+  // good sentence can't strip the learner of their scaffolding mid-chat.
+  const newScore = nextErrorScore(session.recentErrorScore, corrections.length);
+  const { level: newLevel, drift: newDrift } = applyLevelSignal({
+    level: session.currentLevel,
+    drift: session.levelDrift,
+    direction: turn.suggestedLevelChange,
+    errorScore: newScore,
+  });
+  // Advance the assessment cadence; reset it whenever an assessment was produced.
+  const newTurnsSinceAssessment = turn.assessment
+    ? 0
+    : session.turnsSinceAssessment + 1;
+
+  const [updatedSession] = await db
+    .update(sessions)
+    .set({
+      currentLevel: newLevel,
+      levelDrift: newDrift,
+      recentErrorScore: newScore,
+      turnsSinceAssessment: newTurnsSinceAssessment,
+      updatedAt: new Date(),
+    })
+    .where(eq(sessions.id, sessionId))
+    .returning();
+
+  return {
+    teacherMessage: toClientMessage(teacherRow),
+    level: updatedSession.currentLevel,
+  };
+}
+
+/**
  * Advance the conversation: either the learner replied, or the learner asked
  * for escalating help (a hint). Hints are ephemeral (not stored); replies are
  * persisted and drive the adaptive engine + pattern tracking.
+ *
+ * This is the non-streaming path (one full JSON object, returned at once). For
+ * streamed replies (text of the chat appears while the structured panels are
+ * still being generated) see `advanceConversationStream`.
  */
 export async function advanceConversation(
   args: AdvanceArgs,
-): Promise<AdvanceResult | null> {
+): Promise< AdvanceResult | null> {
   const { sessionId, userId, intent } = args;
 
   const [session] = await db
@@ -392,70 +485,20 @@ export async function advanceConversation(
     memories,
   });
 
-  // Persist the teacher's structured turn.
-  const [teacherRow] = await db
-    .insert(messages)
-    .values({
-      sessionId,
-      role: "teacher",
-      content: turn.conversation,
-      payload: turn,
-    })
-    .returning();
-
-  // Update recurring-error tallies from this turn's corrections.
-  const corrections = turn.feedback?.corrections ?? [];
-  await upsertErrorPatterns(sessionId, corrections);
-
-  // Remember any durable facts the learner revealed this turn.
-  await upsertUserMemories(userId, turn.memoryUpdates ?? []);
-
-  // If we drilled a pattern this turn, clear its counter.
-  if (turn.detectedPattern && patternToDrill) {
-    await db
-      .update(errorPatterns)
-      .set({ count: 0, drilledAt: new Date() })
-      .where(
-        and(
-          eq(errorPatterns.sessionId, sessionId),
-          eq(errorPatterns.errorType, patternToDrill.errorType),
-        ),
-      );
-  }
-
-  // Adaptive level + rolling error score. The model's per-turn suggestion is
-  // only a vote: `applyLevelSignal` requires several consistent votes (and a
-  // low error score to promote) before the level actually moves, so a single
-  // good sentence can't strip the learner of their scaffolding mid-chat.
-  const newScore = nextErrorScore(session.recentErrorScore, corrections.length);
-  const { level: newLevel, drift: newDrift } = applyLevelSignal({
-    level: session.currentLevel,
-    drift: session.levelDrift,
-    direction: turn.suggestedLevelChange,
-    errorScore: newScore,
+  // Persist the teacher's structured turn + drive the adaptive engine.
+  const persisted = await persistReplyTurn({
+    sessionId,
+    session,
+    userId,
+    patternToDrill,
+    turn,
   });
-  // Advance the assessment cadence; reset it whenever an assessment was produced.
-  const newTurnsSinceAssessment = turn.assessment
-    ? 0
-    : session.turnsSinceAssessment + 1;
-
-  const [updatedSession] = await db
-    .update(sessions)
-    .set({
-      currentLevel: newLevel,
-      levelDrift: newDrift,
-      recentErrorScore: newScore,
-      turnsSinceAssessment: newTurnsSinceAssessment,
-      updatedAt: new Date(),
-    })
-    .where(eq(sessions.id, sessionId))
-    .returning();
 
   return {
     turn,
     userMessage: toClientMessage(userRow),
-    teacherMessage: toClientMessage(teacherRow),
-    level: updatedSession.currentLevel,
+    teacherMessage: persisted.teacherMessage,
+    level: persisted.level,
   };
 }
 
@@ -493,4 +536,207 @@ async function upsertErrorPatterns(
       });
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Streaming reply path (NDJSON over POST /api/chat).
+// ---------------------------------------------------------------------------
+//
+// A streamed "reply" returns a `Response` whose body is a newline-delimited
+// JSON stream:
+//
+//   {"partial":{"conversation":"..."} ...}\n        ← streamed repeatedly,
+//                                                      growing as the model
+//                                                      emits tokens.
+//                                                      Fields fill in over
+//                                                      time; conversation is
+//                                                      first.
+//   {"userMessage":{...}}\n                        ← the persisted learner
+//                                                      message (id/createdAt)
+//   {"done":{"teacherMessage":...,"turn":...,"level":"..."}}\n
+//                                                  ← final, after persistence.
+//                                                      Replaces the optimistic
+//                                                      teacher bubble with
+//                                                      the real one + panels.
+//
+// The chat text appears as soon as the model starts emitting it; the
+// structured panels (toolkit, feedback, assessment, pattern) only render
+// after `done`, but they're built in the background during the same stream.
+const STREAM_DONE = "done" as const;
+const STREAM_PARTIAL = "partial" as const;
+const STREAM_ERROR = "error" as const;
+
+export interface ChatStreamPartial {
+  type: typeof STREAM_PARTIAL;
+  partial: DeepPartial<TeacherTurn>;
+}
+export interface ChatStreamUserMessage {
+  type: "userMessage";
+  userMessage: ClientMessage;
+}
+export interface ChatStreamDone {
+  type: typeof STREAM_DONE;
+  turn: TeacherTurn;
+  teacherMessage: ClientMessage;
+  level: SessionRow["currentLevel"];
+}
+export interface ChatStreamError {
+  type: typeof STREAM_ERROR;
+  error: string;
+}
+export type ChatStreamMessage =
+  | ChatStreamPartial
+  | ChatStreamUserMessage
+  | ChatStreamDone
+  | ChatStreamError;
+
+function ndjsonLine(value: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(value) + "\n");
+}
+
+/**
+ * Streamed reply path. Equivalent in side effects to `advanceConversation`
+ * for `intent === "reply"`, but emits partial teacher objects while the model
+ * is still generating, then persists once the object is complete.
+ *
+ * Returns a streamed `Response` (NDJSON). Returns `null` only for the
+ * not-found / empty-message early-exit cases, in which case the caller should
+ * produce a normal JSON 404/400 itself.
+ */
+export async function advanceConversationStream(
+  args: AdvanceArgs,
+): Promise<Response | null> {
+  const { sessionId, userId } = args;
+
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  if (!session) return null;
+
+  const user = await loadUser(userId);
+  if (!user) return null;
+
+  const profile = toProfile(user);
+  const memories = await loadUserMemories(userId);
+  const topicLabel = topicEnLabel(session.topic);
+
+  // Recent transcript for the model (chronological).
+  const recentRows = (
+    await db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, sessionId))
+      .orderBy(desc(messages.createdAt))
+      .limit(HISTORY_LIMIT)
+  ).reverse();
+
+  const history = toHistory(recentRows);
+  const gap = gapSinceLastUserMessage(recentRows);
+
+  const tally = await loadErrorTally(sessionId);
+  const errorTally = tally.map((t) => ({
+    errorType: t.errorType,
+    label: t.label,
+    count: t.count,
+  }));
+
+  // intent === "reply"
+  const text = (args.message ?? "").trim();
+  if (!text) return null;
+
+  // Persist the learner's message immediately so it is never lost.
+  const [userRow] = await db
+    .insert(messages)
+    .values({ sessionId, role: "user", content: text })
+    .returning();
+
+  history.push({ role: "user", content: text });
+
+  const patternToDrill =
+    tally
+      .filter((t) => t.count >= PATTERN_THRESHOLD)
+      .sort((a, b) => b.count - a.count)[0] ?? null;
+
+  const assessmentDue = session.turnsSinceAssessment + 1 >= ASSESSMENT_INTERVAL;
+
+  const context: TurnContext = {
+    intent: "reply",
+    currentLevel: session.currentLevel,
+    recentErrorScore: session.recentErrorScore,
+    topic: topicLabel,
+    daypart: args.daypart,
+    weekday: args.weekday,
+    gap,
+    assessmentDue,
+    errorTally,
+    patternToDrill: patternToDrill
+      ? {
+          errorType: patternToDrill.errorType,
+          label: patternToDrill.label,
+          count: patternToDrill.count,
+        }
+      : null,
+  };
+
+  const userMessage = toClientMessage(userRow);
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        controller.enqueue(ndjsonLine({ type: "userMessage", userMessage }));
+
+        const turn = await streamTeacherTurn(
+          { history, context, profile, memories },
+          (partial) => {
+            controller.enqueue(
+              ndjsonLine({
+                type: STREAM_PARTIAL,
+                partial,
+              }),
+            );
+          },
+        );
+
+        const persisted = await persistReplyTurn({
+          sessionId,
+          session,
+          userId,
+          patternToDrill,
+          turn,
+        });
+
+        controller.enqueue(
+          ndjsonLine({
+            type: STREAM_DONE,
+            turn,
+            teacherMessage: persisted.teacherMessage,
+            level: persisted.level,
+          }),
+        );
+        controller.close();
+      } catch (error) {
+        console.error("[chat stream]", error);
+        try {
+          controller.enqueue(
+            ndjsonLine({
+              type: STREAM_ERROR,
+              error:
+                "The tutor could not respond. Please try again.",
+            }),
+          );
+        } finally {
+          controller.close();
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

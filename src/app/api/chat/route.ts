@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { advanceConversation } from "@/lib/services/conversation";
+import {
+  advanceConversation,
+  advanceConversationStream,
+} from "@/lib/services/conversation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DAYPARTS, WEEKDAYS } from "@/lib/time";
 
@@ -26,14 +29,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   if (user.role !== "admin" && user.status !== "approved") {
-    return NextResponse.json({ error: "Account not approved." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Account not approved." },
+      { status: 403 },
+    );
   }
 
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body." },
+      { status: 400 },
+    );
   }
 
   if (parsed.intent === "reply" && !parsed.message?.trim()) {
@@ -41,6 +50,23 @@ export async function POST(request: Request) {
       { error: "A reply must include a message." },
       { status: 400 },
     );
+  }
+
+  // Replies streamNdJSON so the chat text shows up as soon as the model emits
+  // it. Hints keep the simpler JSON path — they don't render a growing bubble,
+  // only a single stuck-help panel, so streaming wouldn't add UX value.
+  if (parsed.intent === "reply") {
+    const stream = await advanceConversationStream({
+      ...parsed,
+      userId: user.id,
+    });
+    if (!stream) {
+      return NextResponse.json(
+        { error: "Session not found or empty message." },
+        { status: 404 },
+      );
+    }
+    return stream;
   }
 
   try {

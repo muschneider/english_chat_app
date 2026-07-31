@@ -7,6 +7,7 @@ import type { ClientMessage } from "@/lib/services/conversation";
 import type { AppUser } from "@/lib/auth/types";
 import { logoutAction } from "@/lib/auth/actions";
 import { currentDaypart, currentWeekday } from "@/lib/time";
+import { readChatStream } from "@/lib/ai/chat-stream";
 import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
@@ -147,7 +148,19 @@ export function ChatApp({ user }: { user: AppUser }) {
       payload: null,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimistic]);
+    // Streaming: the teacher bubble is created empty and grows as `partial`
+    // events arrive. Once the server finishes persistence, `done` swaps it for
+    // the real persisted message (with id/createdAt + the structured payload
+    // that powers the toolkit/feedback/assessment panels).
+    const tempTeacherId = `temp-teacher-${Date.now()}`;
+    const tempTeacher: ClientMessage = {
+      id: tempTeacherId,
+      role: "teacher",
+      content: "",
+      payload: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic, tempTeacher]);
     setSending(true);
 
     try {
@@ -163,13 +176,44 @@ export function ChatApp({ user }: { user: AppUser }) {
         }),
       });
       if (!res.ok) throw new Error("chat failed");
-      const data = await res.json();
-      if (data.teacherMessage) {
-        setMessages((prev) => [...prev, data.teacherMessage]);
-      }
-      if (data.level) setLevel(data.level);
+
+      await readChatStream(res, (msg) => {
+        switch (msg.type) {
+          case "userMessage":
+            // Replace the optimistic user bubble with the persisted one (real id + createdAt).
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === optimistic.id ? (msg.userMessage as ClientMessage) : m,
+              ),
+            );
+            break;
+          case "partial": {
+            const conv = msg.partial.conversation;
+            if (typeof conv === "string" && conv.length > 0) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === tempTeacherId ? { ...m, content: conv } : m,
+                ),
+              );
+            }
+            break;
+          }
+          case "done":
+            setMessages((prev) => [
+              ...prev.filter((m) => m.id !== tempTeacherId),
+              msg.teacherMessage as ClientMessage,
+            ]);
+            setLevel(msg.level as CEFRLevel);
+            break;
+          case "error":
+            setError(msg.error);
+            break;
+        }
+      });
     } catch {
       setError("The tutor could not respond. Please try again.");
+      // Drop the empty teacher bubble if the stream failed before any text.
+      setMessages((prev) => prev.filter((m) => m.id !== tempTeacherId));
     } finally {
       setSending(false);
     }
