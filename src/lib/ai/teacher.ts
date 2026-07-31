@@ -2,6 +2,7 @@ import { generateObject, type ModelMessage } from "ai";
 import type { UserMemoryRow } from "@/lib/db/schema";
 import { getTeacherModel } from "./provider";
 import { teacherTurnSchema, type TeacherTurn } from "./schema";
+import { z } from "zod";
 import {
   TEACHER_SYSTEM_PROMPT,
   buildContextBlock,
@@ -9,6 +10,13 @@ import {
   type LearnerProfile,
   type TurnContext,
 } from "./prompt";
+
+const outputFormatBlock = [
+  "=== OUTPUT FORMAT ===",
+  "Always respond with a single json object (no markdown fences, no prose around it) " +
+    "matching this JSON Schema:",
+  JSON.stringify(z.toJSONSchema(teacherTurnSchema)),
+].join("\n");
 
 export interface GenerateTurnArgs {
   history: ModelMessage[];
@@ -31,10 +39,16 @@ export async function generateTeacherTurn({
   profile,
   memories,
 }: GenerateTurnArgs): Promise<TeacherTurn> {
+  //const system = [
+  //  TEACHER_SYSTEM_PROMPT,
+  //  buildProfileBlock(profile, memories),
+  // buildContextBlock(context),
+  //].join("\n\n");
   const system = [
     TEACHER_SYSTEM_PROMPT,
     buildProfileBlock(profile, memories),
     buildContextBlock(context),
+    outputFormatBlock, // ← novo: contém a palavra "json" + o schema
   ].join("\n\n");
 
   // The AI SDK requires at least one message. On the very first turn there is
