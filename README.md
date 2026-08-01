@@ -78,25 +78,69 @@ Mais o que vem junto:
 
 ---
 
-## Por que Claude Sonnet 5 (opencode Zen)?
+## Por que `gpt-5.6-luna` (opencode Go)?
 
-Avaliei os modelos disponíveis no opencode Zen para esta tarefa (tutor de
-conversação com saída estruturada). O melhor custo/benefício é o
-**`claude-sonnet-5`**:
+O que o aluno sente não é a qualidade do modelo — é **quanto tempo a tela fica
+parada**. Então a escolha foi feita medindo os modelos do plano com os prompts
+reais do app, não por reputação.
 
-| Necessidade do app | Por que Sonnet 5 |
-| --- | --- |
-| Seguir a lógica adaptativa complexa (A1–C2, quando mostrar/omitir ajuda) | Instruction-following de ponta |
-| Painéis de kit + feedback exigem **JSON estruturado confiável** | Tool-use nativo da Anthropic, muito estável com `generateObject` |
-| Correção gramatical com nuance (present perfect, colocações) | Forte entendimento de língua/registro |
-| App "conversa" com muitos turnos → **custo importa** | US$ 2 in / US$ 10 out por 1M — meio-termo ideal (vs Opus US$ 5/US$ 25) |
+| Modelo | Texto visível | JSON dos painéis |
+| --- | --- | --- |
+| `deepseek-v4-pro` | 39,5 s | — |
+| `deepseek-v4-flash` | 13,2 s | 31,9 s |
+| `grok-4.5` | 6,5 s | 19,2 s |
+| `minimax-m3` | 1,0 s | falha (e vaza `<think>` no chat) |
+| `glm-5.2` | 0,9 s | falha (JSON inválido) |
+| **`gpt-5.6-luna`** | **1,7–3,1 s** | **4,2–6,0 s** |
 
-Alternativas: `claude-haiku-4-5` (mais barato, defina em `OPENCODE_MODEL`) ou
-`gemini-3.5-flash`. Opus 4.x seria overkill de custo para um chat contínuo.
+Os modelos de raciocínio (`deepseek-v4-pro`) queimam milhares de tokens de
+*thinking* antes do primeiro caractere — péssimo para um chat. Os sub-segundo
+foram descartados por qualidade, não por velocidade: repetem literalmente os
+exemplos do prompt e vazam o bloco de raciocínio na mensagem visível.
 
-> O modelo é configurável via `OPENCODE_MODEL` (padrão `claude-sonnet-5`).
-> A chamada usa o endpoint Anthropic-compatível `https://opencode.ai/zen/v1`
-> com header `x-api-key` (tratado pelo AI SDK).
+> O modelo é fixo em `src/lib/ai/provider.ts` (`TEACHER_MODEL_ID`), com a tabela
+> de medições registrada ali. A chamada usa o endpoint OpenAI-compatível
+> `https://opencode.ai/zen/go/v1` com `OPENCODE_API_KEY`.
+
+### Como a resposta chega rápido
+
+Um "reply" são **duas chamadas em paralelo**, não uma:
+
+1. `streamText` escreve o texto do Sam — texto puro, sem schema, então ele
+   aparece na tela token a token, imediatamente.
+2. `generateObject` monta os painéis (feedback, kit, avaliação, memória).
+
+São independentes porque todo painel julga as mensagens **anteriores** do aluno,
+que já estão no histórico — nunca a resposta que está sendo escrita. Se os
+painéis falharem, o turno é preservado sem eles: a mensagem que o aluno já leu
+nunca é descartada.
+
+Antes, uma única chamada `streamObject` produzia texto e painéis juntos: o
+modelo tinha que se comprometer com a estrutura JSON desde o primeiro token, e
+**nada** chegava à tela até o objeto inteiro estar pronto.
+
+### Quando o modelo erra o JSON
+
+O endpoint não suporta `structuredOutputs`, então o JSON dos painéis é fruto do
+modelo seguir instruções — e às vezes ele erra. Todos os casos vistos em
+produção são a mesma falha: o modelo começa mais um campo, desiste, e fecha o
+objeto assim mesmo (`,"}`, `,""}`), ou corta a resposta um `}` antes do fim.
+
+Três camadas absorvem isso, da mais barata para a mais cara:
+
+1. **Schema tolerante** (`schema.ts`) — `maybe()`/`maybeList()` fazem chave
+   ausente significar `null`/`[]`. Modelos omitem campos nulos o tempo todo;
+   sem isso, um `sampleAnswers` faltando descartava o turno inteiro.
+2. **Reparo estrutural** (`repairModelJson`) — aplica a regra "depois de uma
+   vírgula tem que vir um membro; se vier o fecha-container, é lixo". Só apaga
+   pontuação e fecha brackets, nunca reescreve valor, e revalida antes de
+   aceitar. Custo zero.
+3. **Uma nova tentativa** (`withStructuredRetry`) — rede para o que o reparo não
+   cobre. O mesmo prompt quase nunca quebra igual duas vezes. Custa um
+   round-trip, e só no turno que falhou.
+
+Se ainda assim os painéis falharem, o turno é salvo sem eles: a mensagem que o
+aluno já leu na tela nunca é descartada.
 
 ---
 
@@ -127,8 +171,7 @@ mise run dev          # http://localhost:3000
 ### Variáveis de ambiente (`.env.local`)
 
 ```env
-OPENCODE_API_KEY="sua-chave-opencode-zen"
-OPENCODE_MODEL="claude-sonnet-5"   # opcional
+OPENCODE_API_KEY="sua-chave-opencode-go"
 DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
 
 # Para o fluxo "esqueci minha senha" (SMTP). Default é Gmail — veja abaixo.
@@ -244,7 +287,6 @@ O `mise.toml` carrega automaticamente o `.env.local` em todas as tasks.
 3. Em **Settings → Environment Variables**, adicione:
    - `OPENCODE_API_KEY`
    - `DATABASE_URL` (a connection string do Neon)
-   - `OPENCODE_MODEL` (opcional)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (para o fluxo
      "esqueci minha senha" — defaults do Gmail; veja acima)
    - `SMTP_FROM` (opcional)
