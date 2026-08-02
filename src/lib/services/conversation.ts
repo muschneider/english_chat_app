@@ -33,6 +33,17 @@ import {
 } from "@/lib/topics";
 
 const HISTORY_LIMIT = 24;
+/**
+ * How much transcript the panels half of a split reply sees.
+ *
+ * It needs far less than the chat does: `feedback` judges exactly one named
+ * message, the toolkit answers exactly one question, and recurring mistakes
+ * arrive pre-counted in `errorTally`. Trimming 24 → 8 measured ~1 s faster with
+ * identical feedback accuracy. The exception is the periodic `assessment`,
+ * which is asked to judge the learner's whole performance and does need the
+ * full window.
+ */
+const PANELS_HISTORY_LIMIT = 8;
 const PATTERN_THRESHOLD = 3;
 /** Run a fresh level assessment every N learner replies. */
 const ASSESSMENT_INTERVAL = 6;
@@ -747,7 +758,7 @@ export async function advanceConversationStream(
         // the session's opening topic and offered vocabulary for a conversation
         // that had moved on turns ago.
         const panels = await generateTeacherPanels({
-          history,
+          history: assessmentDue ? history : history.slice(-PANELS_HISTORY_LIMIT),
           context: { ...context, samReply: conversation },
           profile,
           memories,
